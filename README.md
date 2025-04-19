@@ -42,7 +42,7 @@ git clone https://github.com/yourusername/Football-Match-Prediction-ML.git
 cd Football-Match-Prediction-ML
 ```
 
-2. **Run the Full Pipeline (Train + Evaluate)**
+2. **For Users who want to Run the Full Pipeline (Train + Evaluate)**
 
 ```
 python run_pipeline.py
@@ -58,13 +58,13 @@ This script will:
 - Evaluate performance on the training set
   
 
-3. **Launch Gradio Demo App**
+3. **For users who want to launch Gradio Demo App**
 
 ```
 python demo/app.py
 ```
 
-4. **Run Everything with Docker (Deployment)**
+4. **For users who want Run Everything with Docker (Deployment)**
 
 Build the Docker image:
 ```
@@ -74,7 +74,7 @@ Run the container (Gradio mode):
 ```
 docker run -p 7860:7860 football-predictor
 ```
-Then go to: http://localhost:7860 to access Gradio app
+Then go to: http://localhost:7860 to access the Gradio app
 
 ---
 
@@ -99,7 +99,6 @@ pytest tests/
 - [Gradio](https://gradio.app/) – Web interface  
 - [Docker](https://www.docker.com/) – Containerization  
 - [Matplotlib](https://matplotlib.org/) – Visualization  
-See full list of [contributors](https://github.com/minh-quang-pham-le/Football-Match-Prediction-ML/contributors)
 
 ---
 
