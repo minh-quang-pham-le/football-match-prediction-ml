@@ -64,7 +64,7 @@ This script will:
 python demo/app.py
 ```
 
-4. **Run Everything with Docker**
+4. **Run Everything with Docker (Deployment)**
 
 Build the Docker image:
 ```
@@ -74,7 +74,7 @@ Run the container (Gradio mode):
 ```
 docker run -p 7860:7860 football-predictor
 ```
-Then go to: http://localhost:7860
+Then go to: http://localhost:7860 to access Gradio app
 
 ---
 
@@ -92,19 +92,6 @@ pytest tests/
 
 ---
 
-## Deployment
-
-To deploy the project using Docker:
-
-```
-docker build -t football-predictor .
-docker run -p 7860:7860 football-predictor
-```
-
-Then, access the Gradio app at: [http://localhost:7860](http://localhost:7860)
-
----
-
 ## Built With
 
 - [Scikit-learn](https://scikit-learn.org/) – Machine learning models  
@@ -113,12 +100,6 @@ Then, access the Gradio app at: [http://localhost:7860](http://localhost:7860)
 - [Docker](https://www.docker.com/) – Containerization  
 - [Matplotlib](https://matplotlib.org/) – Visualization  
 See full list of [contributors](https://github.com/minh-quang-pham-le/Football-Match-Prediction-ML/contributors)
-
----
-
-## Versioning
-
-
 
 ---
 
