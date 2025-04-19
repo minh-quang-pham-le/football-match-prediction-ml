@@ -12,7 +12,7 @@ These instructions will help you set up the project on your local machine for de
 
 Make sure the following software is installed:
 
-- Python >= 3.9  
+- Python >= 3.10  
 - pip  
 - Docker (for deployment)  
 - git  
