@@ -1,4 +1,4 @@
-# ⚽ Predicting Football Match Outcomes using Traditional Machine Learning
+# ⚽ Predicting Football Match Outcomes using Traditional Machine Learning ⚽
 
 This project aims to predict the outcomes of football matches (Win/Draw/Loss) using traditional machine learning techniques such as Logistic Regression, Decision Trees, Random Forests, and Gradient Boosting. It leverages the European Soccer Database from Kaggle, containing over 25,000 matches between 2008 and 2016. The project includes an interactive Gradio demo and is packaged with Docker for reproducibility.
 
@@ -17,15 +17,23 @@ Make sure the following software is installed:
 - Docker (for deployment)  
 - git  
 
-You can install dependencies with:
-
-```
-pip install -r requirements.txt
-```
-
 ### Installing
 
-Step-by-step to run locally:
+And you can install all required packages automatically via:
+
+```
+python setup.py
+```
+
+Or manually
+
+```
+python -m venv venv
+source venv/bin/activate    # Windows: venv\Scripts\activate
+pip install -r docker/requirements.txt
+```
+
+## How to Run the Project
 
 1. **Clone the repository**
 
@@ -34,43 +42,52 @@ git clone https://github.com/yourusername/Football-Match-Prediction-ML.git
 cd Football-Match-Prediction-ML
 ```
 
-2. **Prepare the data**
+2. **Run the Full Pipeline (Train + Evaluate)**
 
 ```
-# Download the European Soccer Database from Kaggle
-# Place it in the `data/` folder
+python run_pipeline.py
 ```
+This script will:
 
-3. **Run preprocessing scripts**
+- Load and clean data (data/raw/)
 
-```
-python src/preprocessing.py
-```
+- Generate features (data/features/)
 
-4. **Train the model**
+- Train and save model (models/)
 
-```
-python src/train_model.py
-```
+- Evaluate performance on the training set
+  
 
-5. **Launch the Gradio demo**
+3. **Launch Gradio Demo App**
 
 ```
-python app.py
+python demo/app.py
 ```
+
+4. **Run Everything with Docker**
+
+Build the Docker image:
+```
+docker build -t football-predictor .
+```
+Run the container (Gradio mode):
+```
+docker run -p 7860:7860 football-predictor
+```
+Then go to: http://localhost:7860
 
 ---
 
 ## Running the Tests
 
-To ensure everything works as expected, you can run unit tests and data integrity checks.
+To ensure everything works as expected, you can run unit tests and data integrity checks
 
 ### 🧪 End-to-End Tests
 
 These test the full pipeline from data loading to prediction:
 
 ```
-pytest tests/test_pipeline.py
+pytest tests/
 ```
 
 ---
@@ -92,15 +109,10 @@ Then, access the Gradio app at: [http://localhost:7860](http://localhost:7860)
 
 - [Scikit-learn](https://scikit-learn.org/) – Machine learning models  
 - [Pandas](https://pandas.pydata.org/) – Data manipulation  
-- [Gradio](https://gradio.app/) – Demo interface  
+- [Gradio](https://gradio.app/) – Web interface  
 - [Docker](https://www.docker.com/) – Containerization  
 - [Matplotlib](https://matplotlib.org/) – Visualization  
-
----
-
-## Contributing
-
-
+See full list of [contributors](https://github.com/minh-quang-pham-le/Football-Match-Prediction-ML/contributors)
 
 ---
 
