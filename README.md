@@ -19,7 +19,7 @@ Make sure the following software is installed:
 
 ### Installing
 
-And you can install all required packages automatically via:
+You can install all required packages automatically via:
 
 ```
 python setup.py
