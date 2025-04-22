@@ -38,8 +38,8 @@ pip install -r docker/requirements.txt
 1. **Clone the repository**
 
 ```
-git clone https://github.com/yourusername/Football-Match-Prediction-ML.git
-cd Football-Match-Prediction-ML
+https://github.com/minh-quang-pham-le/football-match-prediction-ml.git
+cd football-match-prediction-ml
 ```
 
 2. **For Users who want to Run the Full Pipeline (Train + Evaluate)**
