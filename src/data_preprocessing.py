@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from sklearn.preprocessing import OneHotEncoder
-from .utils import check_missing_values
 
 def load_raw_data(data_dir: str = 'data/raw'):
     '''Load dữ liệu gốc'''
@@ -11,12 +9,6 @@ def load_raw_data(data_dir: str = 'data/raw'):
     matches = pd.read_csv(data_path / 'match.csv')
     teams = pd.read_csv(data_path / 'teams.csv')
     team_attributes = pd.read_csv(data_path / 'team_attributes.csv')
-    
-    # Kiểm tra giá trị thiếu
-    check_missing_values(matches, 'matches')
-    check_missing_values(teams, 'teams')
-    check_missing_values(team_attributes, 'team_attributes')
-    
     return matches, teams, team_attributes
 
 def convert_dates(matches: pd.DataFrame, team_attributes: pd.DataFrame):
