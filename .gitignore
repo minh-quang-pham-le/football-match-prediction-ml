@@ -1,8 +1,9 @@
 .DS_Store
+#manual addition
 .idea
 .vscode
-.csv
-.sqlite
+*.csv
+*.sqlite
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
