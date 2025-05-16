@@ -5,7 +5,8 @@ import zipfile
 import json
 
 def check_kaggle_auth():
-    """Check if Kaggle authentication is set up correctly"""
+    """ Tra xem người dùng đã cấu hình thông tin xác thực Kaggle hay chưa."""
+    
     kaggle_dir = os.path.expanduser('~/.kaggle')
     kaggle_file = os.path.join(kaggle_dir, 'kaggle.json')
     
@@ -51,7 +52,7 @@ def download_data():
         # Remove the zip file after extraction
         print("Removing zip file...")
         os.remove("data/soccer.zip")
-        print("Download and extraction complete!")
+        print("Download complete!")
 
 def extract_sqlite_to_csv(sqlite_path, output_dir):
     """ Trích xuất tất cả các bảng từ file SQLite và lưu thành các file CSV. """
