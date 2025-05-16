@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
+from typing import Tuple
 from sklearn.preprocessing import OneHotEncoder
 
-def calculate_league_avg_goals(matches, split_year):
+def calculate_league_avg_goals(matches, split_year) -> dict:
     '''Tính trung bình bàn thắng trên sân nhà theo mùa giải (chỉ tính trên tập train để tránh data leakage).'''
     
     train_matches = matches[matches['date'].dt.year <= split_year]
@@ -12,7 +13,7 @@ def calculate_league_avg_goals(matches, split_year):
     league_avg = train_matches.groupby('season')['home_team_goal'].mean().to_dict()
     return league_avg
 
-def calculate_recent_goals(matches, league_avg_goals):
+def calculate_recent_goals(matches, league_avg_goals) -> pd.DataFrame:
     '''Tính trung bình số bàn thắng dựa trên lịch sử đấu của đội'''
     
     matches = matches.sort_values('date')
@@ -53,7 +54,7 @@ def calculate_recent_goals(matches, league_avg_goals):
     
     return matches
 
-def get_nearest_attributes(match_date, team_api_id, attributes_df):
+def get_nearest_attributes(match_date, team_api_id, attributes_df) -> pd.Series:
     '''Lấy tất cả bản ghi team_attributes trước ngày trận đấu, tính trung bình cho cột số, lấy gần nhất cho cột nominal.'''
     
     # Lọc các bản ghi trước ngày trận đấu
@@ -78,7 +79,7 @@ def get_nearest_attributes(match_date, team_api_id, attributes_df):
     # Kết hợp kết quả
     return pd.concat([numeric_avg, categorical_nearest])
 
-def merge_team_attributes(matches, team_attributes):
+def merge_team_attributes(matches: pd.DataFrame, team_attributes: pd.DataFrame) -> pd.DataFrame:
     '''Gộp team attributes vào bảng trận đấu'''
     
     matches['home_team_attrs'] = matches.apply(
@@ -103,7 +104,7 @@ def merge_team_attributes(matches, team_attributes):
     
     return matches
 
-def calculate_home_win_rate(train, test):
+def calculate_home_win_rate(train: pd.DataFrame, test: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     '''Tính tỷ lệ thắng sân nhà từ tập train'''
     
     home_wins = train[train['outcome'] == 'Win'].groupby('home_team_api_id').size()
@@ -115,7 +116,7 @@ def calculate_home_win_rate(train, test):
     print("Đã tính home_win_rate.")
     return train, test
 
-def encode_categorical_columns(train: pd.DataFrame, test: pd.DataFrame, categorical_cols: list):
+def encode_categorical_columns(train: pd.DataFrame, test: pd.DataFrame, categorical_cols: list) -> Tuple[pd.DataFrame, pd.DataFrame]:
     '''Mã hóa các cột nominal bằng One-Hot Encoding.'''
     
     encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
