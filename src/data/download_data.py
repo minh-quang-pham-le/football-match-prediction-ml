@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import pandas as pd
-from typing import List
 
 def download_data():
     """ Tải dữ liệu từ Kaggle về thư mục data """
@@ -11,7 +10,7 @@ def download_data():
         os.system("unzip data/soccer.zip -d data/")
         os.remove("data/soccer.zip")
 
-def extract_sqlite_to_csv(sqlite_path="data/database.sqlite", output_dir="data/raw"):
+def extract_sqlite_to_csv(sqlite_path, output_dir):
     """ Trích xuất tất cả các bảng từ file SQLite và lưu thành các file CSV. """
     
     if not os.path.exists(sqlite_path):
@@ -24,7 +23,8 @@ def extract_sqlite_to_csv(sqlite_path="data/database.sqlite", output_dir="data/r
 
     # Lấy danh sách tên bảng trong database
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
+    exclude_tables = {"sqlite_sequence"}
+    tables = [t[0] for t in cursor.fetchall() if t[0] not in exclude_tables]
 
     for table_name in tables:
         df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
