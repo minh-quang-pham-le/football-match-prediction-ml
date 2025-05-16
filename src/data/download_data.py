@@ -1,14 +1,57 @@
 import os
 import sqlite3
 import pandas as pd
+import zipfile
+import json
+
+def check_kaggle_auth():
+    """Check if Kaggle authentication is set up correctly"""
+    kaggle_dir = os.path.expanduser('~/.kaggle')
+    kaggle_file = os.path.join(kaggle_dir, 'kaggle.json')
+    
+    if not os.path.exists(kaggle_file):
+        print("Kaggle API credentials not found!")
+        print("Please create an API token from kaggle.com and place it at:")
+        print(f"  {kaggle_file}")
+        return False
+    
+    # Verify the file contains valid JSON with expected keys
+    try:
+        with open(kaggle_file, 'r') as f:
+            creds = json.load(f)
+        if 'username' in creds and 'key' in creds:
+            return True
+        else:
+            print("Kaggle credentials file exists but appears to be invalid.")
+            return False
+    except Exception as e:
+        print(f"Error reading Kaggle credentials: {e}")
+        return False
 
 def download_data():
     """ Tải dữ liệu từ Kaggle về thư mục data """
     
     if not os.path.exists("data/database.sqlite"):
+        # Check Kaggle authentication first
+        if not check_kaggle_auth():
+            raise Exception("Kaggle authentication not configured correctly. Cannot download data.")
+        
+        # Make sure the data directory exists
+        os.makedirs("data", exist_ok=True)
+        
+        # Download the dataset using kaggle command
+        print("Downloading dataset from Kaggle...")
         os.system("kaggle datasets download -d hugomathien/soccer -p data/")
-        os.system("unzip data/soccer.zip -d data/")
+        
+        # Extract using Python's zipfile module instead of unzip command
+        print("Extracting zip file...")
+        with zipfile.ZipFile("data/soccer.zip", 'r') as zip_ref:
+            zip_ref.extractall("data/")
+        
+        # Remove the zip file after extraction
+        print("Removing zip file...")
         os.remove("data/soccer.zip")
+        print("Download and extraction complete!")
 
 def extract_sqlite_to_csv(sqlite_path, output_dir):
     """ Trích xuất tất cả các bảng từ file SQLite và lưu thành các file CSV. """

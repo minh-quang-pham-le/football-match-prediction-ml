@@ -1,8 +1,8 @@
-from data.data_preprocessing import *
-from features.feature_engineering import *
-from model.evaluate_model import *
-from utils.utils import *
-from model.train_model import *
+from src.data.data_preprocessing import *
+from src.features.feature_engineering import *
+from src.model.evaluate_model import *
+from src.utils.utils import *
+from src.model.train_model import *
 
 def preprocess_data(data_dir='data/raw'):
     matches, teams, team_attributes = load_raw_data(data_dir)
