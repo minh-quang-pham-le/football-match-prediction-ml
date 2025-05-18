@@ -28,7 +28,7 @@ def calculate_recent_goals(matches, league_avg_goals) -> pd.DataFrame:
         else:
             return league_avg_goals.get(x.name[1], 0)  # season
     
-    weights = np.array([0.4, 0.3, 0.2, 0.1, 0.05])
+    weights = np.array([5, 4, 3, 2, 1])  # Trọng số cho các trận gần nhất
     
     # Tính home_recent_goals
     matches['home_recent_goals'] = matches.groupby('home_team_api_id')['home_team_goal'].transform(

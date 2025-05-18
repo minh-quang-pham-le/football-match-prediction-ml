@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Tuple
-
+    
 def load_raw_data(data_dir: str = 'data/raw') -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     '''Load dữ liệu gốc'''
     
