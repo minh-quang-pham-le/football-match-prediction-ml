@@ -1,16 +1,13 @@
 import pandas as pd
 import numpy as np
-from sklearn.impute import SimpleImputer
 
-def compute_all_features(df, team_attr, players):
+def compute_all_features(df: pd.DataFrame, team_attr: pd.DataFrame, players: pd.DataFrame) -> pd.DataFrame:
 
     # A) Cơ bản
     df['match_year']  = df['date'].dt.year
     df['match_month'] = df['date'].dt.month
 
-    # B) Kết quả & thông số bàn thắng
-    df['goal_diff']   = df['home_team_goal'] - df['away_team_goal']
-    df['total_goals'] = df['home_team_goal'] + df['away_team_goal']
+    # B) Kết quả (Target)
     df['outcome'] = df.apply(
         lambda row: 'Win' if row['home_team_goal'] > row['away_team_goal']
         else 'Draw' if row['home_team_goal'] == row['away_team_goal']
@@ -99,7 +96,7 @@ def compute_all_features(df, team_attr, players):
 
     # 4. Merge vào df
     df = df.merge(  
-        h2h[['match_api_id','h2h_wins_last3','h2h_nobs','h2h_win_rate']],
+        h2h[['match_api_id','h2h_wins_last3','h2h_nobs','h2h_win_rate_last3']],
         on='match_api_id', how='left'
     )
 
@@ -150,7 +147,7 @@ def compute_all_features(df, team_attr, players):
     df['diff_shooting'] = df['home_chanceCreationShooting'] - df['away_chanceCreationShooting']
     df['diff_pressure'] = df['home_defencePressure']     - df['away_defencePressure']
 
-    # G) Player static info (avg height/weight/age)
+    # G) Thông tin cơ bản của player (avg height/weight/age)
     recs = []
     for side in ['home','away']:
         for i in range(1,12):
@@ -180,104 +177,29 @@ def compute_all_features(df, team_attr, players):
     pivot = pivot.reset_index()
     df = df.merge(pivot, on='match_api_id', how='left')
 
-    # H) Additional context
-    df['home_advantage'] = 1
-    df['rest_days'] = df.groupby('home_team_api_id')['date'].diff().dt.days.fillna(0)
-    df['max_stage'] = df.groupby(['league_id','season'])['stage'].transform('max')
-    df['match_importance'] = df['stage'] / df['max_stage']
-    imp_norm = df['match_importance']
-    df['match_imp_cat'] = pd.qcut(
-        imp_norm,
-        q=[0, 0.33, 0.66, 1.0],
-        labels=[1, 2, 3]
-    ).astype(int)
-
-    df.drop(columns=['max_stage'], inplace=True)
+    # H) Các features thêm
+    
+    # Tính match_importance
+    df['match_importance'] = df['stage'] / df.groupby(['league_id','season'])['stage'].transform('max')
+    
+    # Chia 3 pha (early / mid / late) theo mùa
+    df['pct_stage'] = df.groupby(['league_id','season'])['stage'].rank(pct=True)
+    df['match_phase'] = (
+        pd.qcut(
+            df['pct_stage'],
+            q=[0, 0.33, 0.66, 1.0],
+            labels=[1, 2, 3],
+            duplicates='drop'
+        ).astype(int)
+    )
+    df = df.drop(columns=['pct_stage']) 
 
     return df
 
-def add_player_skill_features_asof(df, player_attr):
-    
-    player_attr = (player_attr
-                   .rename(columns={'date': 'attr_date'})
-                   .sort_values(['player_api_id', 'attr_date']))
-    
-    attrs = [
-        'overall_rating','potential','acceleration','sprint_speed',
-        'finishing','crossing','heading_accuracy','dribbling','stamina','strength',
-        'interceptions','standing_tackle','sliding_tackle',
-        'long_passing','short_passing','ball_control',
-        'long_shots','shot_power','curve','free_kick_accuracy','volleys',
-        'penalties'
-    ]
-
-    parts = []
-    for side in ('home', 'away'):
-        for i in range(1, 12):
-            parts.append(
-                df[['match_api_id', 'date', f'{side}_player_{i}']]
-                  .rename(columns={'date': 'match_date',
-                                   f'{side}_player_{i}': 'player_api_id'})
-                  .assign(side=side, position=i)
-            )
-    long = (pd.concat(parts, ignore_index=True)
-              .sort_values(['player_api_id', 'match_date']))
-
-    # Merge_asof to pick the nearest attr_date <= match_date
-    merged = pd.merge_asof(
-        long,
-        player_attr[['player_api_id', 'attr_date'] + attrs],
-        left_on='match_date',
-        right_on='attr_date',
-        by='player_api_id',
-        direction='backward'
-    )
-
-    # Composite feature calculations
-    merged['pace']              = merged[['acceleration','sprint_speed']].mean(axis=1)
-    merged['tackle']            = merged[['standing_tackle','sliding_tackle']].mean(axis=1)
-    merged['passing_skill']     = merged[['short_passing','long_passing', 'ball_control']].mean(axis=1)
-    merged['dribbling_skill']   = merged[['dribbling','ball_control']].mean(axis=1)
-    merged['shooting_skill']    = merged[['long_shots','shot_power','curve','free_kick_accuracy','volleys']].mean(axis=1)
-    merged['physical']          = merged[['strength','stamina']].mean(axis=1)
-    merged['defensive_skill']   = merged[['interceptions','tackle']].mean(axis=1)
-
-    # Select final feature columns to aggregate
-    feat_cols = [
-        'overall_rating','potential','pace','passing_skill','dribbling_skill',
-        'shooting_skill','finishing','physical','defensive_skill',
-        'crossing','heading_accuracy','penalties'
-    ]
-
-    # Aggregate to match-level per side
-    agg = (
-        merged
-        .groupby(['match_api_id','side'])[feat_cols]
-        .mean()
-        .reset_index()
-    )
-
-    # Pivot so we have home_avg_* and away_avg_* columns
-    pivot = agg.pivot(index='match_api_id', columns='side')
-    pivot.columns = [f"{side}_avg_{col}" for col, side in pivot.columns]
-    pivot = pivot.reset_index()
-
-    # Merge back to original df
-    df = df.merge(pivot, on='match_api_id', how='left')
-    return df
-
-def optimized_get_fifa_stats(matches: pd.DataFrame,
-                                     player_stats: pd.DataFrame) -> pd.DataFrame:
-    """
-    Vectorized calculation of home/away average player attributes
-    without using merge_asof, by forward‐filling attribute timelines.
-    Returns a DataFrame with columns:
-      match_api_id,
-      home_avg_<attr>, away_avg_<attr>
-    """
+def get_player_stats(matches: pd.DataFrame, player_attr: pd.DataFrame) -> pd.DataFrame:
     # 1) Prepare player_stats: rename date and sort
     ps = (
-        player_stats
+        player_attr
         .rename(columns={'date':'attr_date'})
         .sort_values(['player_api_id','attr_date'])
     )
@@ -354,3 +276,74 @@ def optimized_get_fifa_stats(matches: pd.DataFrame,
     # Now bring match_api_id back as a column
     avg_stats = avg_stats.reset_index()
     return avg_stats
+
+def add_composite_features(fifa_stats: pd.DataFrame) -> pd.DataFrame:
+    stats = fifa_stats.copy()
+    for side in ('home','away'):
+        # pace = avg(acceleration, sprint_speed)
+        stats[f'{side}_pace'] = stats[[f'{side}_avg_acceleration', f'{side}_avg_sprint_speed']].mean(axis=1)
+        # tackle = avg(standing_tackle, sliding_tackle)
+        stats[f'{side}_tackle'] = stats[[f'{side}_avg_standing_tackle', f'{side}_avg_sliding_tackle']].mean(axis=1)
+        # passing_skill = avg(short_passing, long_passing, ball_control)
+        stats[f'{side}_passing_skill'] = stats[
+            [f'{side}_avg_short_passing', f'{side}_avg_long_passing', f'{side}_avg_ball_control']
+        ].mean(axis=1)
+        # dribbling_skill = avg(dribbling, ball_control)
+        stats[f'{side}_dribbling_skill'] = stats[
+            [f'{side}_avg_dribbling', f'{side}_avg_ball_control']
+        ].mean(axis=1)
+        # shooting_skill = avg(long_shots, shot_power, curve, free_kick_accuracy, volleys)
+        stats[f'{side}_shooting_skill'] = stats[
+            [f'{side}_avg_long_shots', f'{side}_avg_shot_power', f'{side}_avg_curve',
+             f'{side}_avg_free_kick_accuracy', f'{side}_avg_volleys']
+        ].mean(axis=1)
+        # physical = avg(strength, stamina)
+        stats[f'{side}_physical'] = stats[
+            [f'{side}_avg_strength', f'{side}_avg_stamina']
+        ].mean(axis=1)
+        # defensive_skill = avg(interceptions, tackle)
+        stats[f'{side}_defensive_skill'] = stats[
+            [f'{side}_avg_interceptions', f'{side}_tackle']
+        ].mean(axis=1)
+        # direct avg features
+        stats[f'{side}_finishing']          = stats[f'{side}_avg_finishing']
+        stats[f'{side}_crossing']           = stats[f'{side}_avg_crossing']
+        stats[f'{side}_heading_accuracy']   = stats[f'{side}_avg_heading_accuracy']
+        stats[f'{side}_penalties']          = stats[f'{side}_avg_penalties']
+
+    return stats
+
+import pandas as pd
+
+def merge_player_features(matches: pd.DataFrame,
+                          fifa_stats: pd.DataFrame) -> pd.DataFrame:
+    df = matches.copy()
+
+    # 1) Rename avg overall & potential if present
+    for side in ('home', 'away'):
+        avg_over = f'{side}_avg_overall_rating'
+        avg_pot  = f'{side}_avg_potential'
+        if avg_over in fifa_stats.columns:
+            fifa_stats = fifa_stats.rename(columns={avg_over: f'{side}_overall_rating'})
+        if avg_pot in fifa_stats.columns:
+            fifa_stats = fifa_stats.rename(columns={avg_pot: f'{side}_potential'})
+
+    # 2) Define final feature names
+    feat_cols = [
+        'overall_rating', 'potential', 'pace', 'passing_skill', 'dribbling_skill',
+        'shooting_skill', 'finishing', 'physical', 'defensive_skill',
+        'crossing', 'heading_accuracy', 'penalties'
+    ]
+
+    # 3) Build list of columns to merge
+    merge_cols = ['match_api_id']
+    for side in ('home', 'away'):
+        for feat in feat_cols:
+            col = f'{side}_{feat}'
+            if col in fifa_stats.columns:
+                merge_cols.append(col)
+
+    # 4) Subset and merge
+    to_merge = fifa_stats[merge_cols]
+    df = df.merge(to_merge, on='match_api_id', how='left')
+    return df
