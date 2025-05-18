@@ -265,3 +265,92 @@ def add_player_skill_features_asof(df, player_attr):
     # Merge back to original df
     df = df.merge(pivot, on='match_api_id', how='left')
     return df
+
+def optimized_get_fifa_stats(matches: pd.DataFrame,
+                                     player_stats: pd.DataFrame) -> pd.DataFrame:
+    """
+    Vectorized calculation of home/away average player attributes
+    without using merge_asof, by forward‐filling attribute timelines.
+    Returns a DataFrame with columns:
+      match_api_id,
+      home_avg_<attr>, away_avg_<attr>
+    """
+    # 1) Prepare player_stats: rename date and sort
+    ps = (
+        player_stats
+        .rename(columns={'date':'attr_date'})
+        .sort_values(['player_api_id','attr_date'])
+    )
+    ps['player_api_id'] = ps['player_api_id'].astype(int)
+
+    attrs = [
+        'overall_rating','potential','acceleration','sprint_speed',
+        'finishing','crossing','heading_accuracy','dribbling','stamina','strength',
+        'interceptions','standing_tackle','sliding_tackle',
+        'long_passing','short_passing','ball_control',
+        'long_shots','shot_power','curve','free_kick_accuracy','volleys',
+        'penalties'
+    ]
+
+    # 2) Unpivot matches into long form
+    recs = []
+    for side in ('home','away'):
+        for i in range(1,12):
+            col = f'{side}_player_{i}'
+            if col not in matches:
+                continue
+            tmp = (
+                matches[['match_api_id','date', col]]
+                .dropna(subset=[col])
+                .rename(columns={'date':'date', col:'player_api_id'})
+            )
+            tmp['player_api_id'] = tmp['player_api_id'].astype(int)
+            tmp['side']         = side
+            tmp['position']     = i
+            tmp['is_match']     = True
+            recs.append(tmp)
+    match_long = pd.concat(recs, ignore_index=True)
+
+    # 3) Prepare attribute events
+    attr_long = (
+        ps[['player_api_id','attr_date'] + attrs]
+        .rename(columns={'attr_date':'date'})
+    )
+    attr_long['side']         = np.nan
+    attr_long['position']     = np.nan
+    attr_long['match_api_id'] = np.nan
+    attr_long['is_match']     = False
+
+    # 4) Concatenate and forward‐fill per player
+    all_long = pd.concat([attr_long, match_long], sort=False)
+    all_long = all_long.sort_values(['player_api_id','date','is_match'])
+    all_long[attrs] = all_long.groupby('player_api_id')[attrs].ffill()
+
+    # 5) Filter back to match rows
+    merged = all_long[all_long['is_match']].drop(columns=['is_match'])
+
+    # 6) Compute average per match & side
+    avg_stats = (
+        merged
+        .groupby(['match_api_id','side'])[attrs]
+        .mean()
+        .unstack('side')  # creates MultiIndex columns (attr, side)
+    )
+
+    # Rename the MultiIndex columns via the (attr,side)→flat_name map
+    new_cols = {
+        (attr, side): f'{side}_avg_{attr}'
+        for attr in attrs
+        for side in ('home','away')
+    }
+    avg_stats = avg_stats.rename(columns=new_cols)
+
+    # Flatten any remaining MultiIndex entries to a single-level list of strings
+    avg_stats.columns = [
+        col if isinstance(col, str) else new_cols.get(col)
+        for col in avg_stats.columns
+    ]
+
+    # Now bring match_api_id back as a column
+    avg_stats = avg_stats.reset_index()
+    return avg_stats
