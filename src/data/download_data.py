@@ -53,6 +53,7 @@ def download_data():
         print("Removing zip file...")
         os.remove("data/soccer.zip")
         print("Download complete!")
+    return
 
 def extract_sqlite_to_csv(sqlite_path, output_dir):
     """ Trích xuất tất cả các bảng từ file SQLite và lưu thành các file CSV. """
