@@ -1,68 +1,84 @@
 import pandas as pd
 import numpy as np
-from pathlib import Path
 from typing import Tuple
-    
-def load_raw_data(data_dir: str = 'data/raw') -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    '''Load dữ liệu gốc'''
-    
-    data_path = Path(data_dir)
-    matches = pd.read_csv(data_path / 'match.csv')
-    teams = pd.read_csv(data_path / 'teams.csv')
-    team_attributes = pd.read_csv(data_path / 'team_attributes.csv')
-    return matches, teams, team_attributes
+from sklearn.base import BaseEstimator, TransformerMixin
 
-def convert_dates(matches: pd.DataFrame, team_attributes: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    '''Chuyển đổi cột date sang định dạng datetime'''
+def split_train_test(df: pd.DataFrame) -> Tuple[
+    pd.DataFrame, pd.Series,  # X_train, y_train
+    pd.DataFrame, pd.Series,  # X_val,   y_val
+    pd.DataFrame, pd.Series   # X_test,  y_test
+]:
+    train_seasons = ['2008/2009','2009/2010','2010/2011','2011/2012','2012/2013','2013/2014']
+    val_seasons   = ['2014/2015']
+    test_seasons  = ['2015/2016']
     
-    matches['date'] = pd.to_datetime(matches['date'])
-    team_attributes['date'] = pd.to_datetime(team_attributes['date'])
-    return matches, team_attributes
+    df_train = df[df['season'].isin(train_seasons)].reset_index(drop=True)
+    df_val   = df[df['season'].isin(val_seasons)].reset_index(drop=True)
+    df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True)
 
-def create_match_outcome(matches: pd.DataFrame) -> pd.DataFrame:
-    '''Tạo target variable: Win/Loss/Draw'''
-    
-    matches['outcome'] = matches.apply(
-        lambda row: 'Win' if row['home_team_goal'] > row['away_team_goal']
-        else 'Draw' if row['home_team_goal'] == row['away_team_goal']
-        else 'Loss',
-        axis=1
-    )
-    return matches
+    # Tách X và y
+    X_train, y_train = df_train.drop(columns=['outcome']), df_train['outcome']
+    X_val,   y_val   = df_val.drop(columns=['outcome']),   df_val['outcome']
+    X_test,  y_test  = df_test.drop(columns=['outcome']),  df_test['outcome']
 
-def merge_team_names(matches: pd.DataFrame, teams: pd.DataFrame) -> pd.DataFrame:
-    '''Gộp tên đội chủ nhà và đội khách vào bảng trận đấu'''
-    
-    teams_copy = teams.copy()
-    teams_copy.rename(columns={'team_api_id': 'home_team_api_id', 'team_long_name': 'home_team_name'}, inplace = True)
-    matches = matches.merge(teams_copy[['home_team_api_id', 'home_team_name']], on='home_team_api_id', how='left')
-    
-    teams_copy.rename(columns={'home_team_api_id': 'away_team_api_id', 'home_team_name': 'away_team_name'}, inplace = True)
-    matches = matches.merge(teams_copy[['away_team_api_id', 'away_team_name']], on='away_team_api_id', how='left')
-    
-    return matches
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
-def split_train_test(matches, split_year=2015) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    '''Chia dữ liệu thành tập huấn luyện và tập kiểm tra'''
+# Tính toán các giá trị null của các features
+# Imputer transformers
+class ThreeTierGroupImputer(BaseEstimator, TransformerMixin):
+    """
+    Impute by:
+      1) median within (group_by)
+      2) global median fallback
+    Also adds a missing-flag column for each feature.
+    """
+    def __init__(self, columns, group_by, flag_suffix):
+        self.columns = columns
+        self.group_by = group_by
+        self.flag_suffix = flag_suffix
 
-    train = matches[matches['date'].dt.year <= split_year]
-    test = matches[matches['date'].dt.year > split_year]
-    return train, test
+    def fit(self, X, y=None):
+        # compute per-group and global medians
+        self.group_medians_ = {col: X.groupby(self.group_by)[col].median() for col in self.columns}
+        self.global_medians_ = {col: X[col].median() for col in self.columns}
+        return self
 
-def handle_missing_values(train: pd.DataFrame, test: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    '''Xử lý giá trị thiếu trong dữ liệu'''
-    
-    # Điền giá trị 0 cho cột số
-    numeric_cols = train.select_dtypes(include=['float64', 'int64']).columns
-    train[numeric_cols] = train[numeric_cols].fillna(0)
-    test[numeric_cols] = test[numeric_cols].fillna(0)
-    
-    # Điền giá trị phổ biến nhất cho cột phân loại
-    categorical_cols = train.select_dtypes(include=['object']).columns
-    for col in categorical_cols:    
-        if col not in ['home_team_name', 'away_team_name', 'outcome', 'date']:
-            mode_value = train[col].mode()[0]
-            train[col] = train[col].fillna(mode_value)
-            test[col] = test[col].fillna(mode_value)
-    
-    return train, test
+    def transform(self, X):
+        X = X.copy()
+        for col in self.columns:
+            X[f"{col}{self.flag_suffix}"] = X[col].isna().astype(int)
+            grp = X[self.group_by].map(self.group_medians_[col])
+            X[col] = X[col].fillna(grp).fillna(self.global_medians_[col])
+        return X
+
+class GlobalMedianImputer(BaseEstimator, TransformerMixin):
+    """
+    Impute by global median and add missing-flag.
+    """
+    def __init__(self, columns, flag_suffix):
+        self.columns = columns
+        self.flag_suffix = flag_suffix
+
+    def fit(self, X, y=None):
+        self.global_medians_ = {col: X[col].median() for col in self.columns}
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        for col in self.columns:
+            X[f"{col}{self.flag_suffix}"] = X[col].isna().astype(int)
+            X[col] = X[col].fillna(self.global_medians_[col])
+        return X
+
+# diff recalculation
+def recalc_diff(df):
+    diff_map = {
+    'diff_speed': ('home_buildUpPlaySpeed', 'away_buildUpPlaySpeed'),
+    'diff_shooting': ('home_chanceCreationShooting', 'away_chanceCreationShooting'),
+    'diff_pressure': ('home_defencePressure', 'away_defencePressure'),
+}
+    df = df.copy()
+    for dcol, (hcol, acol) in diff_map.items():
+        df[dcol] = df[hcol] - df[acol]
+        df[dcol].fillna(0, inplace=True)
+    return df
