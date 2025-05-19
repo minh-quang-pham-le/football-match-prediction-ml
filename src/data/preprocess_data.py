@@ -93,14 +93,14 @@ def recalc_diff(df):
     return df
 
 def main():
-    # 1) Load raw data
+    # 1) Load data
     df = pd.read_csv('data/processed/df_2.csv')
     
     # 2) Split theo mùa
     X_train, y_train, X_val, y_val, X_test, y_test = split_train_test(df)
     
     # 3) Khởi tạo imputers
-    odds_cols    = [c for c in X_train if c.startswith(('B365','BW','LB','WH','VC'))]
+    odds_cols    = [c for c in X_train if c.startswith(('B365','BW','LB','WH','VC','IW'))]
     tactic_cols  = [
         *[f"home_{p}" for p in ['buildUpPlaySpeed','buildUpPlayPassing',
                                  'chanceCreationPassing','chanceCreationShooting',
@@ -109,8 +109,7 @@ def main():
                                  'chanceCreationPassing','chanceCreationShooting',
                                  'defencePressure','defenceAggression','defenceTeamWidth']]
     ]
-    player_cols  = [c for c in X_train if c.startswith(('home_avg_','away_avg_'
-                                                        ,'home_overall_rating','away_overall_rating'))]
+    player_cols  = [c for c in X_train if c.startswith(('home_avg_','away_avg_'))]
     
     odds_imp   = ThreeTierGroupImputer(odds_cols,   ['league_id','season'],     '_odds_missing')
     tact_imp   = ThreeTierGroupImputer(tactic_cols, ['league_id','prev_season'], '_tactics_missing')
