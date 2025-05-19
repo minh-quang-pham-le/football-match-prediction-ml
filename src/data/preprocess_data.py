@@ -14,9 +14,9 @@ def split_train_test(df: pd.DataFrame) -> Tuple[
     test_seasons  = ['2015/2016']
 
     # Chia dữ liệu thành train, val, test và loại bỏ cột 'season'   
-    df_train = df[df['season'].isin(train_seasons)].reset_index(drop=True).drop(columns=['season'])
-    df_val   = df[df['season'].isin(val_seasons)].reset_index(drop=True).drop(columns=['season'])
-    df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True).drop(columns=['season'])
+    df_train = df[df['season'].isin(train_seasons)].reset_index(drop=True)
+    df_val   = df[df['season'].isin(val_seasons)].reset_index(drop=True)
+    df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True)
 
     # Tách X và y
     X_train, y_train = df_train.drop(columns=['outcome']), df_train['outcome']
@@ -28,29 +28,36 @@ def split_train_test(df: pd.DataFrame) -> Tuple[
 # Tính toán các giá trị null của các features
 # Imputer transformers
 class ThreeTierGroupImputer(BaseEstimator, TransformerMixin):
-    """
-    Impute by:
-      1) median within (group_by)
-      2) global median fallback
-    Also adds a missing-flag column for each feature.
-    """
     def __init__(self, columns, group_by, flag_suffix):
         self.columns = columns
         self.group_by = group_by
         self.flag_suffix = flag_suffix
 
     def fit(self, X, y=None):
-        # compute per-group and global medians
-        self.group_medians_ = {col: X.groupby(self.group_by)[col].median() for col in self.columns}
-        self.global_medians_ = {col: X[col].median() for col in self.columns}
+        self.group_medians_ = {
+            col: X.groupby(self.group_by)[col].median()
+            for col in self.columns
+        }
+        self.global_medians_ = {
+            col: X[col].median() for col in self.columns
+        }
         return self
 
     def transform(self, X):
         X = X.copy()
+        # Tạo key là tuple các giá trị của group_by
+        grp_key = X[self.group_by].apply(lambda r: tuple(r), axis=1)
         for col in self.columns:
+            # flag missing
             X[f"{col}{self.flag_suffix}"] = X[col].isna().astype(int)
-            grp = X[self.group_by].map(self.group_medians_[col])
-            X[col] = X[col].fillna(grp).fillna(self.global_medians_[col])
+            # lấy Series median với MultiIndex
+            grp_med = self.group_medians_[col]
+            # điền NaN theo group median rồi global median
+            X[col] = (
+                X[col]
+                 .fillna(grp_key.map(grp_med))
+                 .fillna(self.global_medians_[col])
+            )
         return X
 
 class GlobalMedianImputer(BaseEstimator, TransformerMixin):
@@ -82,7 +89,7 @@ def recalc_diff(df):
     df = df.copy()
     for dcol, (hcol, acol) in diff_map.items():
         df[dcol] = df[hcol] - df[acol]
-        df[dcol].fillna(0, inplace=True)
+        df.fillna({dcol: 0}, inplace=True)
     return df
 
 def main():
@@ -120,10 +127,15 @@ def main():
     X_val[:]   = recalc_diff(X_val)
     X_test[:]  = recalc_diff(X_test)
     
-    # 6) Tạo folder nếu chưa có
+    # 6) Drop cột 'season' và 'prev_season' trên cả 3 tập train, val, và test
+    X_train.drop(columns=['season','prev_season'], inplace=True)
+    X_val.drop(columns=['season','prev_season'], inplace=True)
+    X_test.drop(columns=['season','prev_season'], inplace=True)
+    
+    # 7) Tạo folder nếu chưa có
     os.makedirs(os.path.join("data","feature"), exist_ok=True)
     
-    # 7) Lưu CSV
+    # 8) Lưu CSV
     X_train.to_csv("data/feature/X_train.csv", index=False)
     y_train.to_csv("data/feature/y_train.csv", index=False, header=True)
     X_val  .to_csv("data/feature/X_val.csv",   index=False)
@@ -131,7 +143,7 @@ def main():
     X_test .to_csv("data/feature/X_test.csv",  index=False)
     y_test .to_csv("data/feature/y_test.csv",  index=False, header=True)
     
-    print("Preprocessing done, features saved to data/feature/")
+    print("[DONE] Preprocessing data đã xong, dữ liệu được lưu vào data/feature/")
 
 if __name__ == "__main__":
     main()

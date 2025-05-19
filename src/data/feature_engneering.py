@@ -101,7 +101,7 @@ def compute_all_features(df: pd.DataFrame, team_attr: pd.DataFrame, players: pd.
     )
 
 
-    # E) Tactical features (median mùa giải trước)
+    # E) Tactical features (lấy bản ghi cuối của mùa giải trước)
     attrs = [
         'buildUpPlaySpeed','buildUpPlayPassing',
         'chanceCreationPassing','chanceCreationShooting',
@@ -351,12 +351,13 @@ if __name__ == "__main__":
     matches = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
     players = pd.read_csv('data/raw/Player.csv', parse_dates=['birthday'])
     team_attr = pd.read_csv('data/raw/Team_attributes.csv', parse_dates=['date'])
+    player_attr = pd.read_csv('data/raw/Player_attributes.csv', parse_dates=['date'])
 
     # 2) Compute all features
     df = compute_all_features(matches, team_attr, players)
 
     # 3) Get player stats
-    player_stats = get_player_stats(matches, team_attr)
+    player_stats = get_player_stats(matches, player_attr)
 
     # 4) Add composite features
     player_stats = add_composite_features(player_stats)
@@ -364,5 +365,24 @@ if __name__ == "__main__":
     # 5) Merge player features into main dataframe
     df = merge_player_features(df, player_stats)
 
-    # 6) Save the final dataframe
+    # 6) Bỏ các cột không cần thiết cho việc dự đoán hoặc gây data leakage
+    cols_to_drop = [
+        'country_id', 'match_api_id', 'home_team_goal', 'away_team_goal', 'date', 
+        'goal', 'shoton', 'shotoff', 'foulcommit', 'card', 'cross', 'corner', 'possession',
+        'home_team_name', 'away_team_name', 'country_name', 'league_name', 'h2h_key',
+    ]
+
+    # Thêm các cột vị trí và cầu thủ
+    for prefix in ['home_player_X', 'home_player_Y', 'away_player_X', 'away_player_Y']:
+        cols_to_drop += [f'{prefix}{i}' for i in range(1, 12)]
+
+    cols_to_drop += [f'home_player_{i}' for i in range(1, 12)]
+    cols_to_drop += [f'away_player_{i}' for i in range(1, 12)]
+
+    df = df.drop(columns=cols_to_drop)
+    df = df.drop(columns=['PSA', 'PSD', 'PSH', 'GBD', 'GBA', 'GBH', 'BSH', 'BSD', 'BSA', 'SJD', 'SJH', 'SJA'])
+
+    # 7) Lưu dataframe đã xử lý
     df.to_csv('data/processed/df_2.csv', index=False)
+    
+    print("[DONE] Đã tính xong các features cần thiết và được lưu vào data/processed/df_2.csv.")

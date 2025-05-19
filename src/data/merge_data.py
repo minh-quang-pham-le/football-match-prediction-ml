@@ -39,3 +39,5 @@ if __name__ == "__main__":
     if not os.path.exists("data/processed"):
         os.makedirs("data/processed", exist_ok=True)
     df.to_csv("data/processed/df_1.csv", index=False)
+    
+    print("[DONE] Bảng Team, League, và Country đã được gộp vào bảng Match \n Và đã được lưu vào data/processed/df_1.csv.")
