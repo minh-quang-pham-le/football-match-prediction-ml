@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 from typing import Tuple
@@ -11,10 +12,11 @@ def split_train_test(df: pd.DataFrame) -> Tuple[
     train_seasons = ['2008/2009','2009/2010','2010/2011','2011/2012','2012/2013','2013/2014']
     val_seasons   = ['2014/2015']
     test_seasons  = ['2015/2016']
-    
-    df_train = df[df['season'].isin(train_seasons)].reset_index(drop=True)
-    df_val   = df[df['season'].isin(val_seasons)].reset_index(drop=True)
-    df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True)
+
+    # Chia dữ liệu thành train, val, test và loại bỏ cột 'season'   
+    df_train = df[df['season'].isin(train_seasons)].reset_index(drop=True).drop(columns=['season'])
+    df_val   = df[df['season'].isin(val_seasons)].reset_index(drop=True).drop(columns=['season'])
+    df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True).drop(columns=['season'])
 
     # Tách X và y
     X_train, y_train = df_train.drop(columns=['outcome']), df_train['outcome']
@@ -82,3 +84,54 @@ def recalc_diff(df):
         df[dcol] = df[hcol] - df[acol]
         df[dcol].fillna(0, inplace=True)
     return df
+
+def main():
+    # 1) Load raw data
+    df = pd.read_csv('data/processed/df_2.csv')
+    
+    # 2) Split theo mùa
+    X_train, y_train, X_val, y_val, X_test, y_test = split_train_test(df)
+    
+    # 3) Khởi tạo imputers
+    odds_cols    = [c for c in X_train if c.startswith(('B365','BW','LB','WH','VC'))]
+    tactic_cols  = [
+        *[f"home_{p}" for p in ['buildUpPlaySpeed','buildUpPlayPassing',
+                                 'chanceCreationPassing','chanceCreationShooting',
+                                 'defencePressure','defenceAggression','defenceTeamWidth']],
+        *[f"away_{p}" for p in ['buildUpPlaySpeed','buildUpPlayPassing',
+                                 'chanceCreationPassing','chanceCreationShooting',
+                                 'defencePressure','defenceAggression','defenceTeamWidth']]
+    ]
+    player_cols  = [c for c in X_train if c.startswith(('home_avg_','away_avg_'
+                                                        ,'home_overall_rating','away_overall_rating'))]
+    
+    odds_imp   = ThreeTierGroupImputer(odds_cols,   ['league_id','season'],     '_odds_missing')
+    tact_imp   = ThreeTierGroupImputer(tactic_cols, ['league_id','prev_season'], '_tactics_missing')
+    attr_imp   = GlobalMedianImputer(player_cols,   '_player_attr_missing')
+    
+    # 4) Fit & transform train, val, test
+    for imp in (odds_imp, tact_imp, attr_imp):
+        imp.fit(X_train)
+        for X in (X_train, X_val, X_test):
+            X[:] = imp.transform(X)
+    
+    # 5) Recalc diff trên cả 3
+    X_train[:] = recalc_diff(X_train)
+    X_val[:]   = recalc_diff(X_val)
+    X_test[:]  = recalc_diff(X_test)
+    
+    # 6) Tạo folder nếu chưa có
+    os.makedirs(os.path.join("data","feature"), exist_ok=True)
+    
+    # 7) Lưu CSV
+    X_train.to_csv("data/feature/X_train.csv", index=False)
+    y_train.to_csv("data/feature/y_train.csv", index=False, header=True)
+    X_val  .to_csv("data/feature/X_val.csv",   index=False)
+    y_val  .to_csv("data/feature/y_val.csv",   index=False, header=True)
+    X_test .to_csv("data/feature/X_test.csv",  index=False)
+    y_test .to_csv("data/feature/y_test.csv",  index=False, header=True)
+    
+    print("Preprocessing done, features saved to data/feature/")
+
+if __name__ == "__main__":
+    main()

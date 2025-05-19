@@ -79,3 +79,11 @@ def extract_sqlite_to_csv(sqlite_path, output_dir):
 
     conn.close()
     print("[DONE] Tất cả bảng đã được trích xuất thành CSV.")
+
+if __name__ == "__main__":
+    # Kiểm tra xem Kaggle API đã được cấu hình chưa
+    check_kaggle_auth()
+    # Tải dữ liệu từ Kaggle
+    download_data()
+    # Chuyển đổi dữ liệu từ định dạng SQLite sang CSV
+    extract_sqlite_to_csv("data/database.sqlite", "data/raw")
