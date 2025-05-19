@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 
 def merge_tables(
@@ -23,3 +24,18 @@ def merge_tables(
     df = df.merge(teams_copy[['away_team_api_id', 'away_team_name']], on='away_team_api_id', how='left')
     
     return df
+
+if __name__ == "__main__":
+    # 1. Load data
+    matches = pd.read_csv('data/raw/matches.csv')
+    league = pd.read_csv('data/raw/leagues.csv')
+    country = pd.read_csv('data/raw/countries.csv')
+    teams = pd.read_csv('data/raw/teams.csv')
+
+    # 2. Merge tables
+    df = merge_tables(matches, league, country, teams)
+
+    # 3. Lưu dữ liệu đã xử lý
+    if not os.path.exists("data/processed"):
+        os.makedirs("data/processed", exist_ok=True)
+    df.to_csv("data/processed/df_1.csv", index=False)

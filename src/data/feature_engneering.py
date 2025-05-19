@@ -313,8 +313,6 @@ def add_composite_features(fifa_stats: pd.DataFrame) -> pd.DataFrame:
 
     return stats
 
-import pandas as pd
-
 def merge_player_features(matches: pd.DataFrame,
                           fifa_stats: pd.DataFrame) -> pd.DataFrame:
     df = matches.copy()
@@ -347,3 +345,24 @@ def merge_player_features(matches: pd.DataFrame,
     to_merge = fifa_stats[merge_cols]
     df = df.merge(to_merge, on='match_api_id', how='left')
     return df
+
+if __name__ == "__main__":
+    # 1) Load data
+    matches = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
+    players = pd.read_csv('data/raw/players.csv', parse_dates=['birthday'])
+    team_attr = pd.read_csv('data/raw/team_attributes.csv', parse_dates=['date'])
+
+    # 2) Compute all features
+    df = compute_all_features(matches, team_attr, players)
+
+    # 3) Get player stats
+    player_stats = get_player_stats(matches, team_attr)
+
+    # 4) Add composite features
+    player_stats = add_composite_features(player_stats)
+
+    # 5) Merge player features into main dataframe
+    df = merge_player_features(df, player_stats)
+
+    # 6) Save the final dataframe
+    df.to_csv('data/processed/df_2.csv', index=False)

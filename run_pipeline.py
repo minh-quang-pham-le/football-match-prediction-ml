@@ -1,4 +1,4 @@
-from src.data.data_preprocessing import *
+from data.preprocess_data import *
 from src.features.feature_engineering import *
 from src.model.evaluate_model import *
 from src.utils.utils import *
