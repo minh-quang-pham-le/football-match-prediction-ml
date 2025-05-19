@@ -27,10 +27,10 @@ def merge_tables(
 
 if __name__ == "__main__":
     # 1. Load data
-    matches = pd.read_csv('data/raw/matches.csv')
-    league = pd.read_csv('data/raw/leagues.csv')
-    country = pd.read_csv('data/raw/countries.csv')
-    teams = pd.read_csv('data/raw/teams.csv')
+    matches = pd.read_csv('data/raw/Match.csv')
+    league = pd.read_csv('data/raw/League.csv')
+    country = pd.read_csv('data/raw/Country.csv')
+    teams = pd.read_csv('data/raw/Team.csv')
 
     # 2. Merge tables
     df = merge_tables(matches, league, country, teams)

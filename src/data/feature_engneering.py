@@ -349,8 +349,8 @@ def merge_player_features(matches: pd.DataFrame,
 if __name__ == "__main__":
     # 1) Load data
     matches = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
-    players = pd.read_csv('data/raw/players.csv', parse_dates=['birthday'])
-    team_attr = pd.read_csv('data/raw/team_attributes.csv', parse_dates=['date'])
+    players = pd.read_csv('data/raw/Player.csv', parse_dates=['birthday'])
+    team_attr = pd.read_csv('data/raw/Team_attributes.csv', parse_dates=['date'])
 
     # 2) Compute all features
     df = compute_all_features(matches, team_attr, players)
