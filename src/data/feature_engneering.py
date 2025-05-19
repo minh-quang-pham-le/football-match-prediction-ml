@@ -280,36 +280,33 @@ def get_player_stats(matches: pd.DataFrame, player_attr: pd.DataFrame) -> pd.Dat
 def add_composite_features(fifa_stats: pd.DataFrame) -> pd.DataFrame:
     stats = fifa_stats.copy()
     for side in ('home','away'):
+        prefix = f'{side}_avg_'
+        
         # pace = avg(acceleration, sprint_speed)
-        stats[f'{side}_pace'] = stats[[f'{side}_avg_acceleration', f'{side}_avg_sprint_speed']].mean(axis=1)
+        stats[f'{prefix}pace'] = stats[[f'{side}_avg_acceleration', f'{side}_avg_sprint_speed']].mean(axis=1)
         # tackle = avg(standing_tackle, sliding_tackle)
-        stats[f'{side}_tackle'] = stats[[f'{side}_avg_standing_tackle', f'{side}_avg_sliding_tackle']].mean(axis=1)
+        stats[f'{prefix}tackle'] = stats[[f'{side}_avg_standing_tackle', f'{side}_avg_sliding_tackle']].mean(axis=1)
         # passing_skill = avg(short_passing, long_passing, ball_control)
-        stats[f'{side}_passing_skill'] = stats[
+        stats[f'{prefix}passing_skill'] = stats[
             [f'{side}_avg_short_passing', f'{side}_avg_long_passing', f'{side}_avg_ball_control']
         ].mean(axis=1)
         # dribbling_skill = avg(dribbling, ball_control)
-        stats[f'{side}_dribbling_skill'] = stats[
+        stats[f'{prefix}dribbling_skill'] = stats[
             [f'{side}_avg_dribbling', f'{side}_avg_ball_control']
         ].mean(axis=1)
         # shooting_skill = avg(long_shots, shot_power, curve, free_kick_accuracy, volleys)
-        stats[f'{side}_shooting_skill'] = stats[
+        stats[f'{prefix}shooting_skill'] = stats[
             [f'{side}_avg_long_shots', f'{side}_avg_shot_power', f'{side}_avg_curve',
              f'{side}_avg_free_kick_accuracy', f'{side}_avg_volleys']
         ].mean(axis=1)
         # physical = avg(strength, stamina)
-        stats[f'{side}_physical'] = stats[
+        stats[f'{prefix}physical'] = stats[
             [f'{side}_avg_strength', f'{side}_avg_stamina']
         ].mean(axis=1)
         # defensive_skill = avg(interceptions, tackle)
-        stats[f'{side}_defensive_skill'] = stats[
-            [f'{side}_avg_interceptions', f'{side}_tackle']
+        stats[f'{prefix}defensive_skill'] = stats[
+            [f'{side}_avg_interceptions', f'{prefix}tackle']
         ].mean(axis=1)
-        # direct avg features
-        stats[f'{side}_finishing']          = stats[f'{side}_avg_finishing']
-        stats[f'{side}_crossing']           = stats[f'{side}_avg_crossing']
-        stats[f'{side}_heading_accuracy']   = stats[f'{side}_avg_heading_accuracy']
-        stats[f'{side}_penalties']          = stats[f'{side}_avg_penalties']
 
     return stats
 
@@ -317,23 +314,14 @@ def merge_player_features(matches: pd.DataFrame,
                           fifa_stats: pd.DataFrame) -> pd.DataFrame:
     df = matches.copy()
 
-    # 1) Rename avg overall & potential if present
-    for side in ('home', 'away'):
-        avg_over = f'{side}_avg_overall_rating'
-        avg_pot  = f'{side}_avg_potential'
-        if avg_over in fifa_stats.columns:
-            fifa_stats = fifa_stats.rename(columns={avg_over: f'{side}_overall_rating'})
-        if avg_pot in fifa_stats.columns:
-            fifa_stats = fifa_stats.rename(columns={avg_pot: f'{side}_potential'})
-
-    # 2) Define final feature names
+    # 1) Define final feature names
     feat_cols = [
         'overall_rating', 'potential', 'pace', 'passing_skill', 'dribbling_skill',
         'shooting_skill', 'finishing', 'physical', 'defensive_skill',
         'crossing', 'heading_accuracy', 'penalties'
     ]
 
-    # 3) Build list of columns to merge
+    # 2) Build list of columns to merge
     merge_cols = ['match_api_id']
     for side in ('home', 'away'):
         for feat in feat_cols:
@@ -341,7 +329,7 @@ def merge_player_features(matches: pd.DataFrame,
             if col in fifa_stats.columns:
                 merge_cols.append(col)
 
-    # 4) Subset and merge
+    # 3) Subset and merge
     to_merge = fifa_stats[merge_cols]
     df = df.merge(to_merge, on='match_api_id', how='left')
     return df
