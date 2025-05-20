@@ -4,6 +4,8 @@ import numpy as np
 from typing import Tuple
 from sklearn.base import BaseEstimator, TransformerMixin
 
+outcome_to_int = {'Loss': 0, 'Draw': 1, 'Win': 2}   # Win-Loss-Draw -> 2-0-1
+
 def split_train_test(df: pd.DataFrame) -> Tuple[
     pd.DataFrame, pd.Series,  # X_train, y_train
     pd.DataFrame, pd.Series,  # X_val,   y_val
@@ -19,9 +21,9 @@ def split_train_test(df: pd.DataFrame) -> Tuple[
     df_test  = df[df['season'].isin(test_seasons)].reset_index(drop=True)
 
     # Tách X và y
-    X_train, y_train = df_train.drop(columns=['outcome']), df_train['outcome']
-    X_val,   y_val   = df_val.drop(columns=['outcome']),   df_val['outcome']
-    X_test,  y_test  = df_test.drop(columns=['outcome']),  df_test['outcome']
+    X_train, y_train = df_train.drop(columns=['outcome']), df_train['outcome'].map(outcome_to_int).astype('int8')
+    X_val,   y_val   = df_val.drop(columns=['outcome']),   df_val['outcome'].map(outcome_to_int).astype('int8')
+    X_test,  y_test  = df_test.drop(columns=['outcome']),  df_test['outcome'].map(outcome_to_int).astype('int8')
 
     return X_train, y_train, X_val, y_val, X_test, y_test
 
