@@ -6,7 +6,7 @@ from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import classification_report, accuracy_score
 from lightgbm import LGBMClassifier, early_stopping
-from xgboost import XGBClassifier
+from xgboost import XGBClassifier, callback
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from scipy.stats import randint, uniform
@@ -85,7 +85,7 @@ def main():
               "model__subsample":        uniform(0.6, 0.4),
               "model__colsample_bytree": uniform(0.6, 0.4) },
             pre_tree,
-            {"eval_set":[(X_val,y_val)], "early_stopping_rounds":50}
+            {"eval_set":[(X_val,y_val)], "callbacks":[callback.EarlyStopping(rounds=50, metric='mlogloss', save_best=True, verbose=False)]}
         ),
         "RandomForest": (
             RandomForestClassifier(class_weight=cls_weight_dict,
