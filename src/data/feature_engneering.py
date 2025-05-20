@@ -310,9 +310,9 @@ def add_composite_features(fifa_stats: pd.DataFrame) -> pd.DataFrame:
 
     return stats
 
-def merge_player_features(matches: pd.DataFrame,
+def merge_player_features(df: pd.DataFrame,
                           fifa_stats: pd.DataFrame) -> pd.DataFrame:
-    df = matches.copy()
+    df = df.copy()
 
     # 1) Define final feature names
     feat_cols = [
@@ -324,8 +324,9 @@ def merge_player_features(matches: pd.DataFrame,
     # 2) Build list of columns to merge
     merge_cols = ['match_api_id']
     for side in ('home', 'away'):
+        prefix = f'{side}_avg_'
         for feat in feat_cols:
-            col = f'{side}_{feat}'
+            col = f'{prefix}{feat}'
             if col in fifa_stats.columns:
                 merge_cols.append(col)
 
@@ -336,13 +337,14 @@ def merge_player_features(matches: pd.DataFrame,
 
 if __name__ == "__main__":
     # 1) Load data
-    matches = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
+    df = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
+    matches = pd.read_csv('data/raw/Match.csv', parse_dates=['date'])
     players = pd.read_csv('data/raw/Player.csv', parse_dates=['birthday'])
     team_attr = pd.read_csv('data/raw/Team_attributes.csv', parse_dates=['date'])
     player_attr = pd.read_csv('data/raw/Player_attributes.csv', parse_dates=['date'])
 
     # 2) Compute all features
-    df = compute_all_features(matches, team_attr, players)
+    df = compute_all_features(df, team_attr, players)
 
     # 3) Get player stats
     player_stats = get_player_stats(matches, player_attr)
