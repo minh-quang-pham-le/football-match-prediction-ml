@@ -130,9 +130,9 @@ def main():
     X_test[:]  = recalc_diff(X_test)
     
     # 6) Drop cột 'season' và 'prev_season' trên cả 3 tập train, val, và test
-    X_train.drop(columns=['season','prev_season'], inplace=True)
-    X_val.drop(columns=['season','prev_season'], inplace=True)
-    X_test.drop(columns=['season','prev_season'], inplace=True)
+    X_train.drop(columns=['season','prev_season','league_id','home_team_api_id','away_team_api_id','id'], inplace=True)
+    X_val.drop(columns=['season','prev_season','league_id','home_team_api_id','away_team_api_id','id'], inplace=True)
+    X_test.drop(columns=['season','prev_season','league_id','home_team_api_id','away_team_api_id','id'], inplace=True)
     
     # 7) Tạo folder nếu chưa có
     os.makedirs(os.path.join("data","feature"), exist_ok=True)
