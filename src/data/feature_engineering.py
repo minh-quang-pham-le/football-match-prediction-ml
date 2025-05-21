@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 
 def compute_all_features(df: pd.DataFrame, team_attr: pd.DataFrame, players: pd.DataFrame) -> pd.DataFrame:
 
@@ -337,7 +338,7 @@ def merge_player_features(df: pd.DataFrame,
 
 if __name__ == "__main__":
     # 1) Load data
-    df = pd.read_csv('data/processed/df_1.csv', parse_dates=['date'])
+    df = pd.read_csv('data/raw/Match.csv', parse_dates=['date'])
     matches = pd.read_csv('data/raw/Match.csv', parse_dates=['date'])
     players = pd.read_csv('data/raw/Player.csv', parse_dates=['birthday'])
     team_attr = pd.read_csv('data/raw/Team_attributes.csv', parse_dates=['date'])
@@ -359,7 +360,7 @@ if __name__ == "__main__":
     cols_to_drop = [
         'country_id', 'match_api_id', 'home_team_goal', 'away_team_goal', 'date', 
         'goal', 'shoton', 'shotoff', 'foulcommit', 'card', 'cross', 'corner', 'possession',
-        'home_team_name', 'away_team_name', 'country_name', 'league_name', 'h2h_key',
+        'h2h_key'
     ]
 
     # Thêm các cột vị trí và cầu thủ
@@ -373,6 +374,8 @@ if __name__ == "__main__":
     df = df.drop(columns=['PSA', 'PSD', 'PSH', 'GBD', 'GBA', 'GBH', 'BSH', 'BSD', 'BSA', 'SJD', 'SJH', 'SJA'])
 
     # 7) Lưu dataframe đã xử lý
-    df.to_csv('data/processed/df_2.csv', index=False)
+    if not os.path.exists('data/processed'):
+        os.makedirs('data/processed')
+    df.to_csv('data/processed/df.csv', index=False)
     
-    print("[DONE] Đã tính xong các features cần thiết và được lưu vào data/processed/df_2.csv.")
+    print("[DONE] Đã tính xong các features cần thiết và được lưu vào data/processed/df.csv.")
