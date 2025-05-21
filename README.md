@@ -49,6 +49,19 @@ python run_pipeline.py
 ```
 This script will:
 
+3. **For Users who want to Run the Prediction App**
+
+```
+python run_app.py --mode [simple|medium|full]
+```
+
+This will launch a Gradio web interface with three available modes:
+- **Simple Mode**: Select from existing matches in the test set (2015/2016 season)
+- **Medium Mode**: Select teams and match date (players are automatically filled in)
+- **Full Mode**: Select teams, individual players for each team, and match date
+
+For more details about the prediction app, see [README_APP.md](README_APP.md)
+
 - Load and clean data (data/raw/)
 
 - Generate features (data/features/)

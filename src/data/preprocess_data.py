@@ -96,7 +96,7 @@ def recalc_diff(df):
 
 def main():
     # 1) Load data
-    df = pd.read_csv('data/processed/df_2.csv')
+    df = pd.read_csv('data/processed/df.csv')
     
     # 2) Split theo mùa
     X_train, y_train, X_val, y_val, X_test, y_test = split_train_test(df)
@@ -120,8 +120,9 @@ def main():
     # 4) Fit & transform train, val, test
     for imp in (odds_imp, tact_imp, attr_imp):
         imp.fit(X_train)
-        for X in (X_train, X_val, X_test):
-            X[:] = imp.transform(X)
+        X_train = imp.transform(X_train)
+        X_val   = imp.transform(X_val)
+        X_test  = imp.transform(X_test)
     
     # 5) Recalc diff trên cả 3
     X_train[:] = recalc_diff(X_train)

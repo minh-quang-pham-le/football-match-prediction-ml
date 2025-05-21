@@ -5,10 +5,12 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import classification_report, accuracy_score
-from lightgbm import LGBMClassifier, early_stopping
+from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
+from lightgbm import early_stopping as lgb_early_stop
+from xgboost.callback import EarlyStopping as xgb_early_stop
 from scipy.stats import randint, uniform
 import json
 warnings.filterwarnings('ignore')
@@ -40,9 +42,6 @@ def build_preprocessors(X):
         ('pas', 'passthrough', flag_cols)
     ])
     return pre_tree, pre_lin
-  
-def prefix_fit_params(step_name: str, params: dict):
-    return {f"{step_name}__{k}": v for k, v in params.items()}
 
 # Helper cân bằng lớp
 def make_class_weight(y):
@@ -59,33 +58,35 @@ def main():
     
     # 2) Khởi tạo các preprocessors
     pre_tree, pre_lin = build_preprocessors(X_train)
-    
+    pre_tree.fit(X_train)
+    X_val_tree = pre_tree.transform(X_val)
     cls_weight_dict, sample_weight_train = make_class_weight(y_train)
     
     # 3) Xác định các model và hyperparameters
     models = {
         "LightGBM": (
             LGBMClassifier(objective='multiclass', metric='multi_logloss', 
-                           class_weight = cls_weight_dict, device='gpu', random_state=42),
+                           class_weight = cls_weight_dict, device='gpu', random_state=42,
+                           callbacks=[lgb_early_stop(stopping_rounds=50, first_metric_only=True, verbose=False)]),
             { "model__num_leaves":       randint(31, 512),
               "model__max_depth":        [-1, 7, 11, 15, 19],
               "model__learning_rate":    uniform(0.01, 0.29),
               "model__n_estimators":     randint(200, 801),
               "model__min_child_samples":randint(10, 200) },
             pre_tree,
-            {"eval_set":[(X_val,y_val)], "callbacks":[early_stopping(50, first_metric_only=True, verbose=False)]}
+            {"model__eval_set":[(X_val_tree,y_val)]}
         ),
         "XGBoost": (
             XGBClassifier(objective='multi:softprob',
-                          tree_method='gpu_hist', eval_metric='mlogloss',
-                          random_state=42),
+                          tree_method='hist', device = 'cuda', eval_metric='mlogloss',
+                          random_state=42, callbacks=[xgb_early_stop(rounds=50, metric_name='mlogloss', data_name ='validation_0', save_best=False)]),
             { "model__max_depth":        randint(3, 12),
               "model__learning_rate":    uniform(0.01, 0.29),
               "model__n_estimators":     randint(200, 800),
               "model__subsample":        uniform(0.6, 0.4),
               "model__colsample_bytree": uniform(0.6, 0.4) },
             pre_tree,
-            {"eval_set":[(X_val,y_val)], "early_stopping_rounds":50}
+            {"model__eval_set":[(X_val_tree,y_val)]}
         ),
         "RandomForest": (
             RandomForestClassifier(class_weight=cls_weight_dict,
@@ -128,14 +129,13 @@ def main():
         print(f"\n▶▶ {name}: Randomized search ({n_iter} configs, 3-fold)")
         
         pipe = Pipeline([('prep', prep), ('model', est)])
-        fit_params = prefix_fit_params('model', fit_kw)
         search = RandomizedSearchCV(
             pipe, dist, n_iter=n_iter, cv=tscv,
             scoring='accuracy', n_jobs=-1, random_state=42, verbose=1, refit=True
         )
         
         tic = time.time()
-        search.fit(X_train, y_train, **fit_params)
+        search.fit(X_train, y_train, **fit_kw)
         toc = time.time()
         print(f"↳ Done in {(toc-tic)/60:.1f} min — best Acc={search.best_score_:.4f}")
 
