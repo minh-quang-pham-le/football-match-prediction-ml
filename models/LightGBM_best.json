@@ -1,9 +1,7 @@
 {
-  "model__learning_rate": 0.045391088104985856,
-  "model__max_depth": 19,
-  "model__min_child_samples": 17,
-  "model__n_estimators": 234,
-  "model__num_leaves": 236,
-  "model__reg_alpha": 0.7821212151464816,
-  "model__reg_lambda": 0.36447217557612466
+  "model__learning_rate": 0.13386125870161433,
+  "model__max_depth": 15,
+  "model__min_child_samples": 12,
+  "model__n_estimators": 558,
+  "model__num_leaves": 228
 }
