@@ -1,0 +1,6 @@
+{
+  "model__C": 23.099382562214902,
+  "model__class_weight": null,
+  "model__penalty": "l2",
+  "model__solver": "saga"
+}
