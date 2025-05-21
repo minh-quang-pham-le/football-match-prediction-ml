@@ -1,8 +1,6 @@
 {
-  "model__learning_rate": 0.01958471254115903,
-  "model__max_depth": 2,
-  "model__min_samples_leaf": 1,
-  "model__min_samples_split": 3,
-  "model__n_estimators": 152,
-  "model__subsample": 0.7447263801387816
+  "model__learning_rate": 0.014083148587374493,
+  "model__max_depth": 4,
+  "model__n_estimators": 180,
+  "model__subsample": 0.855670976374325
 }
