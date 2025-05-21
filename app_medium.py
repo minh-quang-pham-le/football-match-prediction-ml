@@ -14,7 +14,7 @@ DATA_DIR = 'data'
 def load_data():
     """Load necessary data for prediction"""
     # Load teams and matches
-    teams_df = pd.read_csv(os.path.join(DATA_DIR, 'feature', 'X_test.csv'))
+    teams_df = pd.read_csv(os.path.join(DATA_DIR, 'raw', 'Team.csv'))
     matches_df = pd.read_csv(os.path.join(DATA_DIR, 'raw', 'Match.csv'))
     
     # Load processed data
@@ -303,26 +303,26 @@ def create_interface_medium():
         gr.Markdown("# Football Match Prediction")
         gr.Markdown("Select teams and a date to predict the match outcome.")
         
+        # Load team and model data first - this gets the data ready for the dropdowns
+        teams_df, _, _, models_dict = load_data()
+        team_choices = [(name, id) for name, id in zip(teams_df['team_long_name'], teams_df['team_api_id'])]
+        model_choices = [(f"{name} Model", name) for name in models_dict.keys()]
+        
         with gr.Row():
             with gr.Column():
-                home_team = gr.Dropdown(label="Select Home Team", interactive=True)
+                home_team = gr.Dropdown(label="Select Home Team", choices=team_choices, interactive=True)
             with gr.Column():
-                away_team = gr.Dropdown(label="Select Away Team", interactive=True)
+                away_team = gr.Dropdown(label="Select Away Team", choices=team_choices, interactive=True)
         
         with gr.Row():
             match_date = gr.Textbox(
                 label="Match Date (YYYY-MM-DD)", 
                 value="2016-05-15"  # Late in the 2015/2016 season
             )
-            model_selector = gr.Dropdown(label="Select Prediction Model", interactive=True)
+            model_selector = gr.Dropdown(label="Select Prediction Model", choices=model_choices, interactive=True)
         
         predict_btn = gr.Button("Predict Match Outcome")
         result_output = gr.Markdown()
-        
-        # Load teams and models when the app starts
-        home_team.update = load_teams
-        away_team.update = load_teams
-        model_selector.update = load_models
         
         # Run prediction when button clicked
         predict_btn.click(
