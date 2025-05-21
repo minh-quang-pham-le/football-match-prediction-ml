@@ -271,56 +271,227 @@ def generate_features(
     pred_df['diff_speed'] = pred_df['home_buildUpPlaySpeed'] - pred_df['away_buildUpPlaySpeed']
     pred_df['diff_shooting'] = pred_df['home_chanceCreationShooting'] - pred_df['away_chanceCreationShooting']
     pred_df['diff_pressure'] = pred_df['home_defencePressure'] - pred_df['away_defencePressure']
-    
-    # 8. Player attributes
-    # Get latest player attributes
+      # 8. Player attributes
+    # Get latest player attributes - with validation
     selected_players = home_players + away_players
-    player_attributes = player_attrs_df[player_attrs_df['player_api_id'].isin(selected_players)].sort_values('date', ascending=False).drop_duplicates('player_api_id')
-    
-    # Calculate average physical attributes for home and away teams
-    home_players_attrs = player_attributes[player_attributes['player_api_id'].isin(home_players)]
-    away_players_attrs = player_attributes[player_attributes['player_api_id'].isin(away_players)]
-    
-    # Physical attributes
-    pred_df['home_avg_height'] = home_players_attrs['height'].mean()
-    pred_df['away_avg_height'] = away_players_attrs['height'].mean()
-    pred_df['home_avg_weight'] = home_players_attrs['weight'].mean()
-    pred_df['away_avg_weight'] = away_players_attrs['weight'].mean()
-    
-    # Calculate average age
-    player_info = players_df[players_df['player_api_id'].isin(selected_players)]
-    
-    # Convert birthday to datetime
-    player_info['birthday'] = pd.to_datetime(player_info['birthday'])
-    selected_date_dt = pd.to_datetime(selected_date)
-    
-    # Merge player info with home and away players
-    home_players_info = player_info[player_info['player_api_id'].isin(home_players)]
-    away_players_info = player_info[player_info['player_api_id'].isin(away_players)]
-    
-    # Calculate age for each player
-    home_players_info['age'] = (selected_date_dt - home_players_info['birthday']).dt.days / 365
-    away_players_info['age'] = (selected_date_dt - away_players_info['birthday']).dt.days / 365
-    
-    # Average age
-    pred_df['home_avg_age'] = home_players_info['age'].mean()
-    pred_df['away_avg_age'] = away_players_info['age'].mean()
-    
-    # 9. Player skills
-    # Calculate average ratings for different skills
-    for side, team_attrs in [('home', home_players_attrs), ('away', away_players_attrs)]:
-        pred_df[f'{side}_avg_overall_rating'] = team_attrs['overall_rating'].mean()
-        pred_df[f'{side}_avg_potential'] = team_attrs['potential'].mean()
-        pred_df[f'{side}_avg_pace'] = team_attrs[['acceleration', 'sprint_speed']].mean(axis=1).mean()
-        pred_df[f'{side}_avg_passing_skill'] = team_attrs[['short_passing', 'long_passing']].mean(axis=1).mean()
-        pred_df[f'{side}_avg_dribbling_skill'] = team_attrs['dribbling'].mean()
-        pred_df[f'{side}_avg_shooting_skill'] = team_attrs[['shot_power', 'long_shots']].mean(axis=1).mean()
-        pred_df[f'{side}_avg_finishing'] = team_attrs['finishing'].mean()
-        pred_df[f'{side}_avg_physical'] = team_attrs[['stamina', 'strength']].mean(axis=1).mean()
-        pred_df[f'{side}_avg_defensive_skill'] = team_attrs[['standing_tackle', 'sliding_tackle']].mean(axis=1).mean()
-        pred_df[f'{side}_avg_crossing'] = team_attrs['crossing'].mean()
-        pred_df[f'{side}_avg_heading_accuracy'] = team_attrs['heading_accuracy'].mean()
-        pred_df[f'{side}_avg_penalties'] = team_attrs['penalties'].mean()
+    try:
+        player_attributes = player_attrs_df[player_attrs_df['player_api_id'].isin(selected_players)].sort_values('date', ascending=False).drop_duplicates('player_api_id')
+        # Verify required columns are present in the dataset
+        missing_cols = []
+        required_columns = ['height', 'weight', 'overall_rating', 'potential', 'acceleration', 'sprint_speed', 
+                           'short_passing', 'long_passing', 'dribbling', 'shot_power', 'long_shots', 
+                           'finishing', 'stamina', 'strength', 'standing_tackle', 'sliding_tackle', 
+                           'crossing', 'heading_accuracy', 'penalties']
+        
+        for col in required_columns:
+            if col not in player_attrs_df.columns:
+                missing_cols.append(col)
+                
+        if missing_cols:
+            print(f"Warning: The following required columns are missing from player attributes data: {missing_cols}")
+            
+        # Calculate average physical attributes for home and away teams
+        home_players_attrs = player_attributes[player_attributes['player_api_id'].isin(home_players)]
+        away_players_attrs = player_attributes[player_attributes['player_api_id'].isin(away_players)]
+    except Exception as e:
+        print(f"Error processing player attributes: {e}")
+        # Create empty DataFrames as fallback
+        home_players_attrs = pd.DataFrame()
+        away_players_attrs = pd.DataFrame()
+      # Physical attributes with enhanced error handling
+    try:
+        # Check if columns exist before attempting to access them
+        if 'height' in home_players_attrs.columns and not home_players_attrs.empty:
+            pred_df['home_avg_height'] = home_players_attrs['height'].mean()
+        else:
+            pred_df['home_avg_height'] = 180.0  # Default value
+            
+        if 'height' in away_players_attrs.columns and not away_players_attrs.empty:
+            pred_df['away_avg_height'] = away_players_attrs['height'].mean()
+        else:
+            pred_df['away_avg_height'] = 180.0  # Default value
+            
+        if 'weight' in home_players_attrs.columns and not home_players_attrs.empty:
+            pred_df['home_avg_weight'] = home_players_attrs['weight'].mean()
+        else:
+            pred_df['home_avg_weight'] = 175.0  # Default value
+            
+        if 'weight' in away_players_attrs.columns and not away_players_attrs.empty:
+            pred_df['away_avg_weight'] = away_players_attrs['weight'].mean()
+        else:
+            pred_df['away_avg_weight'] = 175.0  # Default value
+    except Exception as e:
+        print(f"Warning: Error calculating physical attributes: {e}. Using default values.")
+        # Set default values for missing physical attributes
+        pred_df['home_avg_height'] = 180.0  # Average height in cm
+        pred_df['away_avg_height'] = 180.0
+        pred_df['home_avg_weight'] = 175.0  # Average weight in kg
+        pred_df['away_avg_weight'] = 175.0
+      # Calculate average age
+    try:
+        player_info = players_df[players_df['player_api_id'].isin(selected_players)]
+        
+        # Convert birthday to datetime
+        player_info['birthday'] = pd.to_datetime(player_info['birthday'])
+        selected_date_dt = pd.to_datetime(selected_date)
+        
+        # Merge player info with home and away players
+        home_players_info = player_info[player_info['player_api_id'].isin(home_players)]
+        away_players_info = player_info[player_info['player_api_id'].isin(away_players)]
+        
+        # Calculate age for each player
+        home_players_info['age'] = (selected_date_dt - home_players_info['birthday']).dt.days / 365
+        away_players_info['age'] = (selected_date_dt - away_players_info['birthday']).dt.days / 365
+        
+        # Average age
+        pred_df['home_avg_age'] = home_players_info['age'].mean() if not home_players_info.empty else 27.0  # Default age
+        pred_df['away_avg_age'] = away_players_info['age'].mean() if not away_players_info.empty else 27.0  # Default age
+    except Exception as e:
+        print(f"Warning: Error calculating player ages: {e}. Using default values.")
+        pred_df['home_avg_age'] = 27.0  # Default average age
+        pred_df['away_avg_age'] = 27.0
+      # 9. Player skills    # Calculate average ratings for different skills
+    try:
+        for side, team_attrs in [('home', home_players_attrs), ('away', away_players_attrs)]:
+            # Use default values when dataframe is empty
+            if team_attrs.empty or len(team_attrs) == 0:
+                # Default values for player skills (median values typical for football players)
+                pred_df[f'{side}_avg_overall_rating'] = 70.0
+                pred_df[f'{side}_avg_potential'] = 75.0
+                pred_df[f'{side}_avg_pace'] = 70.0
+                pred_df[f'{side}_avg_passing_skill'] = 65.0
+                pred_df[f'{side}_avg_dribbling_skill'] = 65.0
+                pred_df[f'{side}_avg_shooting_skill'] = 60.0
+                pred_df[f'{side}_avg_finishing'] = 60.0
+                pred_df[f'{side}_avg_physical'] = 70.0
+                pred_df[f'{side}_avg_defensive_skill'] = 65.0
+                pred_df[f'{side}_avg_crossing'] = 60.0
+                pred_df[f'{side}_avg_heading_accuracy'] = 65.0
+                pred_df[f'{side}_avg_penalties'] = 65.0
+                continue
+                
+            # Calculate averages if we have data
+            # Check if columns exist before calculating
+            if 'overall_rating' in team_attrs.columns:
+                pred_df[f'{side}_avg_overall_rating'] = team_attrs['overall_rating'].mean()
+            else:
+                pred_df[f'{side}_avg_overall_rating'] = 70.0  # Default
+                
+            if 'potential' in team_attrs.columns:
+                pred_df[f'{side}_avg_potential'] = team_attrs['potential'].mean()
+            else:
+                pred_df[f'{side}_avg_potential'] = 75.0  # Default
+              # Handle each skill with enhanced error handling
+            try:
+                required_cols = ['acceleration', 'sprint_speed']
+                if all(col in team_attrs.columns for col in required_cols):
+                    pred_df[f'{side}_avg_pace'] = team_attrs[required_cols].mean(axis=1).mean()
+                else:
+                    pred_df[f'{side}_avg_pace'] = 70.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating pace: {e}. Using default value.")
+                pred_df[f'{side}_avg_pace'] = 70.0  # Default
+                
+            try:
+                required_cols = ['short_passing', 'long_passing']
+                if all(col in team_attrs.columns for col in required_cols):
+                    pred_df[f'{side}_avg_passing_skill'] = team_attrs[required_cols].mean(axis=1).mean()
+                else:
+                    pred_df[f'{side}_avg_passing_skill'] = 65.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating passing skill: {e}. Using default value.")
+                pred_df[f'{side}_avg_passing_skill'] = 65.0  # Default
+            
+            try:
+                if 'dribbling' in team_attrs.columns:
+                    pred_df[f'{side}_avg_dribbling_skill'] = team_attrs['dribbling'].mean()
+                else:
+                    pred_df[f'{side}_avg_dribbling_skill'] = 65.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating dribbling skill: {e}. Using default value.")
+                pred_df[f'{side}_avg_dribbling_skill'] = 65.0  # Default
+                
+            try:
+                required_cols = ['shot_power', 'long_shots']
+                if all(col in team_attrs.columns for col in required_cols):
+                    pred_df[f'{side}_avg_shooting_skill'] = team_attrs[required_cols].mean(axis=1).mean()
+                else:
+                    pred_df[f'{side}_avg_shooting_skill'] = 60.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating shooting skill: {e}. Using default value.")
+                pred_df[f'{side}_avg_shooting_skill'] = 60.0  # Default
+                
+            try:
+                if 'finishing' in team_attrs.columns:
+                    pred_df[f'{side}_avg_finishing'] = team_attrs['finishing'].mean()
+                else:
+                    pred_df[f'{side}_avg_finishing'] = 60.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating finishing: {e}. Using default value.")
+                pred_df[f'{side}_avg_finishing'] = 60.0  # Default
+                
+            try:
+                required_cols = ['stamina', 'strength']
+                if all(col in team_attrs.columns for col in required_cols):
+                    pred_df[f'{side}_avg_physical'] = team_attrs[required_cols].mean(axis=1).mean()
+                else:
+                    pred_df[f'{side}_avg_physical'] = 70.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating physical: {e}. Using default value.")
+                pred_df[f'{side}_avg_physical'] = 70.0  # Default
+                
+            try:
+                required_cols = ['standing_tackle', 'sliding_tackle']
+                if all(col in team_attrs.columns for col in required_cols):
+                    pred_df[f'{side}_avg_defensive_skill'] = team_attrs[required_cols].mean(axis=1).mean()
+                else:
+                    pred_df[f'{side}_avg_defensive_skill'] = 65.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating defensive skill: {e}. Using default value.")
+                pred_df[f'{side}_avg_defensive_skill'] = 65.0  # Default
+                
+            try:
+                if 'crossing' in team_attrs.columns:
+                    pred_df[f'{side}_avg_crossing'] = team_attrs['crossing'].mean()
+                else:
+                    pred_df[f'{side}_avg_crossing'] = 60.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating crossing: {e}. Using default value.")
+                pred_df[f'{side}_avg_crossing'] = 60.0  # Default
+                
+            try:
+                if 'heading_accuracy' in team_attrs.columns:
+                    pred_df[f'{side}_avg_heading_accuracy'] = team_attrs['heading_accuracy'].mean()
+                else:
+                    pred_df[f'{side}_avg_heading_accuracy'] = 65.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating heading accuracy: {e}. Using default value.")
+                pred_df[f'{side}_avg_heading_accuracy'] = 65.0  # Default
+                
+            try:
+                if 'penalties' in team_attrs.columns:
+                    pred_df[f'{side}_avg_penalties'] = team_attrs['penalties'].mean()
+                else:
+                    pred_df[f'{side}_avg_penalties'] = 65.0  # Default
+            except Exception as e:
+                print(f"Warning: Error calculating penalties: {e}. Using default value.")
+                pred_df[f'{side}_avg_penalties'] = 65.0  # Default
+    except Exception as e:
+        print(f"Warning: Error calculating player skills: {e}. Using default values.")
+        # Set default values for all skills for both sides
+        for side in ['home', 'away']:
+            pred_df[f'{side}_avg_overall_rating'] = 70.0
+            pred_df[f'{side}_avg_potential'] = 75.0
+            pred_df[f'{side}_avg_pace'] = 70.0
+            pred_df[f'{side}_avg_passing_skill'] = 65.0
+            pred_df[f'{side}_avg_dribbling_skill'] = 65.0
+            pred_df[f'{side}_avg_shooting_skill'] = 60.0
+            pred_df[f'{side}_avg_finishing'] = 60.0
+            pred_df[f'{side}_avg_physical'] = 70.0
+            pred_df[f'{side}_avg_defensive_skill'] = 65.0
+            pred_df[f'{side}_avg_crossing'] = 60.0
+            pred_df[f'{side}_avg_heading_accuracy'] = 65.0
+            pred_df[f'{side}_avg_penalties'] = 65.0
     
     # 10. Match details
     pred_df['match_importance'] = 1.0  # Assuming maximum importance
@@ -439,44 +610,65 @@ def predict_football_match(
         if isinstance(selected_model, tuple):
             selected_model = selected_model[1]
         
-        # Get player IDs (they're passed from the dropdown value)
-        home_players = [
-            home_player_1, home_player_2, home_player_3, home_player_4, home_player_5,
-            home_player_6, home_player_7, home_player_8, home_player_9, home_player_10, home_player_11
-        ]
+    # Get player IDs (they're passed from the dropdown value)
+        home_players = []
+        away_players = []
         
-        away_players = [
-            away_player_1, away_player_2, away_player_3, away_player_4, away_player_5,
-            away_player_6, away_player_7, away_player_8, away_player_9, away_player_10, away_player_11
-        ]
+        # Validate home players and handle any None values
+        for player in [home_player_1, home_player_2, home_player_3, home_player_4, home_player_5,
+                      home_player_6, home_player_7, home_player_8, home_player_9, home_player_10, home_player_11]:
+            if player is not None:  # Only add valid players
+                home_players.append(player)
         
-        # Load data
+        # Validate away players and handle any None values
+        for player in [away_player_1, away_player_2, away_player_3, away_player_4, away_player_5,
+                      away_player_6, away_player_7, away_player_8, away_player_9, away_player_10, away_player_11]:
+            if player is not None:  # Only add valid players
+                away_players.append(player)
+        
+        # Check if we have enough players
+        if len(home_players) < 11 or len(away_players) < 11:
+            print(f"Warning: Not all player positions filled. Using {len(home_players)} home players and {len(away_players)} away players.")
+            
+        # If no players at all, warn the user
+        if len(home_players) == 0 or len(away_players) == 0:
+            return "Error: Please select at least one player for each team."
+          # Load data
         teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models = load_data()
         
         # Load selected model
-        model, metadata = load_model(selected_model)
+        try:
+            model, metadata = load_model(selected_model)
+        except Exception as e:
+            return f"Error loading model: {str(e)}"
         
         # Try to predict using processed data first
         prediction = None
         if not processed_df.empty:
             print("Attempting to use processed data for prediction...")
-            prediction = predict_with_processed_data(
-                model, home_team_id, away_team_id, match_date, processed_df, metadata
-            )
+            try:
+                prediction = predict_with_processed_data(
+                    model, home_team_id, away_team_id, match_date, processed_df, metadata
+                )
+            except Exception as e:
+                print(f"Error using processed data: {e}")
         
         # If processed data prediction failed, fall back to feature generation
         if prediction is None:
             print("Falling back to manual feature generation...")
-            # Generate features
-            features_df = generate_features(
-                home_team_id, away_team_id, 
-                home_players, away_players, 
-                match_date,
-                teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df
-            )
-            
-            # Make prediction
-            prediction = predict_match(model, features_df, metadata)
+            try:
+                # Generate features
+                features_df = generate_features(
+                    home_team_id, away_team_id, 
+                    home_players, away_players, 
+                    match_date,
+                    teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df
+                )
+                
+                # Make prediction
+                prediction = predict_match(model, features_df, metadata)
+            except Exception as e:
+                return f"Error making prediction: {str(e)}"
             
         # Prepare result
         # Get team names with safer handling in case team is not found
