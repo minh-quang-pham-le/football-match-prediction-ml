@@ -2,7 +2,7 @@ import warnings, os, joblib, time
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import classification_report, accuracy_score
 from lightgbm import LGBMClassifier
@@ -25,21 +25,16 @@ def load_data():
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 def build_preprocessors(X):
-    id_cols   = ['league_id','home_team_api_id','away_team_api_id']
     flag_cols = [c for c in X.columns if c.endswith('_missing')]
-    cat_cols  = ['match_phase','stage']
-    num_cols  = [c for c in X.columns if c not in (*id_cols, *flag_cols, *cat_cols)]
+    ord_num_cols = ['stage', 'match_phase']
+    num_cols  = [c for c in X.columns if c not in (*flag_cols, *ord_num_cols)]
 
     pre_tree = ColumnTransformer([
-        ('id',  OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), id_cols),
-        ('cat', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), cat_cols),
-        ('pas', 'passthrough', flag_cols + num_cols)
+        ('pas', 'passthrough', num_cols + flag_cols + ord_num_cols)
     ])
     pre_lin = ColumnTransformer([
-        ('id',  OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), id_cols),
-        ('cat', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), cat_cols),
         ('sc',  StandardScaler(), num_cols),
-        ('pas', 'passthrough', flag_cols)
+        ('pas', 'passthrough', flag_cols + ord_num_cols)
     ])
     return pre_tree, pre_lin
 
