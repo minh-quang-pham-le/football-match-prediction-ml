@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import gradio as gr
+from gradio import update  # Add this import
 import joblib
 import json
 from typing import Dict, List
@@ -106,19 +107,28 @@ def predict_with_feature_modification(home_team_id, away_team_id, date, selected
     # Load test features
     X_test = pd.read_csv(os.path.join(DATA_DIR, 'feature', 'X_test.csv'))
     
-    # Get base features
-    base_features = X_test[X_test['match_api_id'] == base_match_id].copy()
+    # Since X_test doesn't have match_api_id, we'll use the first entry
+    # We'll modify the home_team_api_id and away_team_api_id later anyway
+    base_features = X_test.iloc[0:1].copy()
     
-    if base_features.empty:
-        return "Error: Could not find suitable base match for prediction."
-    
-    # Modify the features to match our teams
+    print(f"DEBUG: Using base features with shape: {base_features.shape}")
+      # Modify the features to match our teams
     base_features['home_team_api_id'] = home_team_id
     base_features['away_team_api_id'] = away_team_id
     
     # Get team names
-    home_team_name = teams_df[teams_df['team_api_id'] == home_team_id]['team_long_name'].iloc[0]
-    away_team_name = teams_df[teams_df['team_api_id'] == away_team_id]['team_long_name'].iloc[0]
+    home_team_rows = teams_df[teams_df['team_api_id'] == home_team_id]
+    away_team_rows = teams_df[teams_df['team_api_id'] == away_team_id]
+    
+    if home_team_rows.empty:
+        home_team_name = f"Team ID {home_team_id}"
+    else:
+        home_team_name = home_team_rows['team_long_name'].iloc[0]
+        
+    if away_team_rows.empty:
+        away_team_name = f"Team ID {away_team_id}"
+    else:
+        away_team_name = away_team_rows['team_long_name'].iloc[0]
     
     # Load selected model
     model, metadata = load_model(selected_model)
@@ -239,8 +249,25 @@ def predict_with_processed_data(home_team_id, away_team_id, match_date, selected
 def predict_football_match(home_team, away_team, match_date, selected_model):
     """Main prediction function for the Gradio interface"""
     try:
-        home_team_id = int(home_team)
-        away_team_id = int(away_team)
+        # Debug output
+        print(f"DEBUG: home_team={home_team}, type={type(home_team)}")
+        print(f"DEBUG: away_team={away_team}, type={type(away_team)}")
+        print(f"DEBUG: selected_model={selected_model}, type={type(selected_model)}")
+        
+        # Extract team IDs - if the input is a tuple like (name, id), use the id (second item)
+        if isinstance(home_team, tuple):
+            home_team_id = int(home_team[1])
+        else:
+            home_team_id = int(home_team)
+            
+        if isinstance(away_team, tuple):
+            away_team_id = int(away_team[1])
+        else:
+            away_team_id = int(away_team)
+        
+        # Extract model name if it's a tuple
+        if isinstance(selected_model, tuple):
+            selected_model = selected_model[1]
         
         # Load data
         teams_df, matches_df, processed_df, _ = load_data()
@@ -259,30 +286,38 @@ def predict_football_match(home_team, away_team, match_date, selected_model):
         
         return result
     except Exception as e:
+        # Print the full exception details to the console for debugging
+        import traceback
+        traceback.print_exc()
         return f"Error: {str(e)}"
 
 def load_teams():
     """Load teams for dropdowns"""
     teams_df, test_matches_df, processed_df, _ = load_data()
     
-    # Get team IDs that appear in the processed data
-    if not processed_df.empty:
-        home_teams = set(processed_df['home_team_api_id'])
-        away_teams = set(processed_df['away_team_api_id'])
-        available_team_ids = list(home_teams.union(away_teams))
-        
-        # Filter teams to only those in the available data
-        available_teams = teams_df[teams_df['team_api_id'].isin(available_team_ids)]
-    else:
-        # If processed data not available, use test matches
-        home_teams = set(test_matches_df['home_team_api_id'])
-        away_teams = set(test_matches_df['away_team_api_id'])
-        available_team_ids = list(home_teams.union(away_teams))
-        available_teams = teams_df[teams_df['team_api_id'].isin(available_team_ids)]
+    # Option 1: Get all teams from Team.csv without filtering
+    # This will show all teams regardless of whether they have match data
+    team_dict = dict(zip(teams_df['team_long_name'], teams_df['team_api_id']))
     
-    # Create a dict mapping team name to team_api_id
-    team_dict = dict(zip(available_teams['team_long_name'], available_teams['team_api_id']))
-    return gr.Dropdown.update(choices=list(team_dict.items()))
+    # Option 2 (current method): Filter teams to only those with match data
+    # if not processed_df.empty:
+    #     home_teams = set(processed_df['home_team_api_id'])
+    #     away_teams = set(processed_df['away_team_api_id'])
+    #     available_team_ids = list(home_teams.union(away_teams))
+    #     
+    #     # Filter teams to only those in the available data
+    #     available_teams = teams_df[teams_df['team_api_id'].isin(available_team_ids)]
+    # else:
+    #     # If processed data not available, use test matches
+    #     home_teams = set(test_matches_df['home_team_api_id'])
+    #     away_teams = set(test_matches_df['away_team_api_id'])
+    #     available_team_ids = list(home_teams.union(away_teams))
+    #     available_teams = teams_df[teams_df['team_api_id'].isin(available_team_ids)]
+    # 
+    # # Create a dict mapping team name to team_api_id
+    # team_dict = dict(zip(available_teams['team_long_name'], available_teams['team_api_id']))
+    
+    return gr.update(choices=list(team_dict.items()))
 
 def load_models():
     """Load available models for dropdown"""
@@ -291,11 +326,11 @@ def load_models():
     # Check if models are available
     if not models:
         print("Warning: No models found in the models directory")
-        return gr.Dropdown.update(choices=[])
+        return gr.update(choices=[])
         
     # Return model names with descriptions
     model_choices = [(f"{name} Model", name) for name in models.keys()]
-    return gr.Dropdown.update(choices=model_choices)
+    return gr.update(choices=model_choices)
 
 def create_interface_medium():
     """Create medium complexity Gradio interface"""

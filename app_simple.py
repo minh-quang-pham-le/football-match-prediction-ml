@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import gradio as gr
+from gradio import update  # Add this import
 import joblib
 import json
 from typing import Dict, List
@@ -28,49 +29,11 @@ def load_data():
     test_season = '2015/2016'
     test_matches_df = matches_df[matches_df['season'] == test_season].copy()
     
-    # Create a dict of available matches for the dropdown
-    team_names = dict(zip(teams_df['team_api_id'], teams_df['team_long_name']))
-    available_matches = []
-    
-    # Use matches from processed data if available, otherwise use raw data
-    if not processed_df.empty:
-        match_source = processed_df
-        print("Using processed data for match list")
-    else:
-        match_source = test_matches_df
-        print("Using raw data for match list")
-    
-    for i, match in match_source.iterrows():
-        if i >= 100:  # Limit to first 100 matches to avoid huge dropdown
-            break
-            
-        if 'home_team_api_id' in match and 'away_team_api_id' in match:
-            home_id = match['home_team_api_id']
-            away_id = match['away_team_api_id']
-            
-            home_name = team_names.get(home_id, f"Team {home_id}")
-            away_name = team_names.get(away_id, f"Team {away_id}")
-            
-            # Use match date if available, otherwise use index
-            if 'date' in match:
-                date_str = f"({match['date']})"
-            else:
-                date_str = f"(Match #{i})"
-                
-            # Use match_api_id if available, otherwise use row index
-            if 'match_api_id' in match:
-                match_id = match['match_api_id']
-            else:
-                match_id = i
-                
-            match_key = f"{match_id}: {home_name} vs {away_name} {date_str}"
-            available_matches.append((match_key, match_id))
-    
     # Get all available models
     model_files = [f for f in os.listdir(MODELS_DIR) if f.endswith('.pkl')]
     models = {f.replace('_best.pkl', ''): f for f in model_files if '_best.pkl' in f}
     
-    return teams_df, test_matches_df, processed_df, available_matches, models
+    return teams_df, test_matches_df, processed_df, models
 
 def load_model(model_name):
     """Load model and metadata by name"""
@@ -174,10 +137,18 @@ def predict_match(match_features, model, metadata):
 def predict_football_match(match_id, selected_model):
     """Main prediction function for the Gradio interface"""
     try:
-        match_id = int(match_id)
+        # Extract match_id if it's a tuple
+        if isinstance(match_id, tuple):
+            match_id = match_id[1]
+        else:
+            match_id = int(match_id)
+        
+        # Extract model name if it's a tuple
+        if isinstance(selected_model, tuple):
+            selected_model = selected_model[1]
         
         # Load data
-        teams_df, matches_df, processed_df, _, _ = load_data()
+        teams_df, matches_df, processed_df, _ = load_data()
         
         # Get match features
         match_features, home_team_name, away_team_name = prepare_match_features(match_id, matches_df, processed_df, teams_df)
@@ -200,19 +171,65 @@ def predict_football_match(match_id, selected_model):
         
         return result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Error: {str(e)}"
 
 def load_matches():
     """Load available matches for dropdown"""
-    _, _, _, available_matches, _ = load_data()
-    return gr.Dropdown.update(choices=available_matches)
+    teams_df, test_matches_df, processed_df, _ = load_data()
+    
+    # Create a dict of available matches for the dropdown
+    team_names = dict(zip(teams_df['team_api_id'], teams_df['team_long_name']))
+    available_matches = []
+    
+    # Use matches from processed data if available, otherwise use raw data
+    if not processed_df.empty:
+        match_source = processed_df
+        print("Using processed data for match list")
+    else:
+        match_source = test_matches_df
+        print("Using raw data for match list")
+    
+    for i, match in match_source.iterrows():
+        if i >= 100:  # Limit to first 100 matches to avoid huge dropdown
+            break
+            
+        if 'home_team_api_id' in match and 'away_team_api_id' in match:
+            home_id = match['home_team_api_id']
+            away_id = match['away_team_api_id']
+            
+            home_name = team_names.get(home_id, f"Team {home_id}")
+            away_name = team_names.get(away_id, f"Team {away_id}")
+            
+            # Use match date if available, otherwise use index
+            if 'date' in match:
+                date_str = f"({match['date']})"
+            else:
+                date_str = f"(Match #{i})"
+                  # Use match_api_id if available, otherwise use row index
+            if 'match_api_id' in match:
+                match_id = match['match_api_id']
+            else:
+                match_id = i
+                
+            match_key = f"{match_id}: {home_name} vs {away_name} {date_str}"
+            available_matches.append((match_key, match_id))
+    
+    return gr.update(choices=available_matches)
 
 def load_models():
     """Load available models for dropdown"""
-    _, _, _, _, models = load_data()
-    # Return model names with descriptions for better display
+    _, _, _, models = load_data()
+    
+    # Check if models are available
+    if not models:
+        print("Warning: No models found in the models directory")
+        return gr.update(choices=[])
+        
+    # Return model names with descriptions
     model_choices = [(f"{name} Model", name) for name in models.keys()]
-    return gr.Dropdown.update(choices=model_choices)
+    return gr.update(choices=model_choices)
 
 def create_interface_simple():
     """Create simplified Gradio interface for testing"""
@@ -220,16 +237,54 @@ def create_interface_simple():
         gr.Markdown("# Football Match Prediction - Simple Tester")
         gr.Markdown("Select a match and model to predict the outcome.")
         
+        # Load data for the dropdowns
+        teams_df, test_matches_df, processed_df, models_dict = load_data()
+        
+        # Get matches for the dropdown
+        team_names = dict(zip(teams_df['team_api_id'], teams_df['team_long_name']))
+        available_matches = []
+        
+        # Use matches from processed data if available, otherwise use raw data
+        if not processed_df.empty:
+            match_source = processed_df
+        else:
+            match_source = test_matches_df
+        
+        for i, match in match_source.iterrows():
+            if i >= 100:  # Limit to first 100 matches to avoid huge dropdown
+                break
+                
+            if 'home_team_api_id' in match and 'away_team_api_id' in match:
+                home_id = match['home_team_api_id']
+                away_id = match['away_team_api_id']
+                
+                home_name = team_names.get(home_id, f"Team {home_id}")
+                away_name = team_names.get(away_id, f"Team {away_id}")
+                
+                # Use match date if available, otherwise use index
+                if 'date' in match:
+                    date_str = f"({match['date']})"
+                else:
+                    date_str = f"(Match #{i})"
+                    
+                # Use match_api_id if available, otherwise use row index
+                if 'match_api_id' in match:
+                    match_id = match['match_api_id']
+                else:
+                    match_id = i
+                    
+                match_key = f"{match_id}: {home_name} vs {away_name} {date_str}"
+                available_matches.append((match_key, match_id))
+        
+        # Model choices
+        model_choices = [(f"{name} Model", name) for name in models_dict.keys()]
+        
         with gr.Row():
-            match_selector = gr.Dropdown(label="Select Match", interactive=True)
-            model_selector = gr.Dropdown(label="Select Prediction Model", interactive=True)
+            match_selector = gr.Dropdown(label="Select Match", choices=available_matches, interactive=True)
+            model_selector = gr.Dropdown(label="Select Prediction Model", choices=model_choices, interactive=True)
         
         predict_btn = gr.Button("Predict Match Outcome")
         result_output = gr.Markdown()
-        
-        # Load matches and models when the app starts
-        match_selector.update = load_matches
-        model_selector.update = load_models
         
         # Run prediction when button clicked
         predict_btn.click(

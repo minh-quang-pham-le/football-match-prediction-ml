@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import gradio as gr
+from gradio import update  # Add this import
 import joblib
 import json
 from datetime import datetime
@@ -56,7 +57,8 @@ def load_data():
     # Filter to include only test season (2015/2016)
     test_season = '2015/2016'
     test_matches_df = matches_df[matches_df['season'] == test_season].copy()
-      # Get all available models
+    
+    # Get all available models
     model_files = [f for f in os.listdir(MODELS_DIR) if f.endswith('.pkl')]
     models = {f.replace('_best.pkl', ''): f for f in model_files if '_best.pkl' in f}
     
@@ -421,94 +423,122 @@ def predict_football_match(
     away_player_6, away_player_7, away_player_8, away_player_9, away_player_10, away_player_11,
     match_date, selected_model
 ):
-    # Get team IDs
-    home_team_id = int(home_team)
-    away_team_id = int(away_team)
-    
-    # Get player IDs (they're passed from the dropdown value)
-    home_players = [
-        home_player_1, home_player_2, home_player_3, home_player_4, home_player_5,
-        home_player_6, home_player_7, home_player_8, home_player_9, home_player_10, home_player_11
-    ]
-    
-    away_players = [
-        away_player_1, away_player_2, away_player_3, away_player_4, away_player_5,
-        away_player_6, away_player_7, away_player_8, away_player_9, away_player_10, away_player_11
-    ]
-    
-    # Load data
-    teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models = load_data()
-    
-    # Load selected model
-    model, metadata = load_model(selected_model)
-    
-    # Try to predict using processed data first
-    prediction = None
-    if not processed_df.empty:
-        print("Attempting to use processed data for prediction...")
-        prediction = predict_with_processed_data(
-            model, home_team_id, away_team_id, match_date, processed_df, metadata
-        )
-    
-    # If processed data prediction failed, fall back to feature generation
-    if prediction is None:
-        print("Falling back to manual feature generation...")
-        # Generate features
-        features_df = generate_features(
-            home_team_id, away_team_id, 
-            home_players, away_players, 
-            match_date,
-            teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df
-        )
+    try:
+        # Extract team IDs - if the input is a tuple like (name, id), use the id (second item)
+        if isinstance(home_team, tuple):
+            home_team_id = int(home_team[1])
+        else:
+            home_team_id = int(home_team)
+            
+        if isinstance(away_team, tuple):
+            away_team_id = int(away_team[1])
+        else:
+            away_team_id = int(away_team)
         
-        # Make prediction
-        prediction = predict_match(model, features_df, metadata)
-      # Prepare result
-    # Get team names with safer handling in case team is not found
-    home_team_filter = teams_df['team_api_id'] == home_team_id
-    away_team_filter = teams_df['team_api_id'] == away_team_id
-    
-    home_team_name = teams_df[home_team_filter]['team_long_name'].iloc[0] if any(home_team_filter) else f"Team {home_team_id}"
-    away_team_name = teams_df[away_team_filter]['team_long_name'].iloc[0] if any(away_team_filter) else f"Team {away_team_id}"
-    
-    # Format the output
-    result = f"## Match Prediction: {home_team_name} vs {away_team_name}\n\n"
-    result += f"**Win Probability for {home_team_name}:** {prediction['Win']*100:.2f}%\n\n"
-    result += f"**Draw Probability:** {prediction['Draw']*100:.2f}%\n\n"
-    result += f"**Win Probability for {away_team_name}:** {prediction['Loss']*100:.2f}%\n\n"
-    result += f"**Model Used:** {selected_model}\n"
-    
-    return result
+        # Extract model name if it's a tuple
+        if isinstance(selected_model, tuple):
+            selected_model = selected_model[1]
+        
+        # Get player IDs (they're passed from the dropdown value)
+        home_players = [
+            home_player_1, home_player_2, home_player_3, home_player_4, home_player_5,
+            home_player_6, home_player_7, home_player_8, home_player_9, home_player_10, home_player_11
+        ]
+        
+        away_players = [
+            away_player_1, away_player_2, away_player_3, away_player_4, away_player_5,
+            away_player_6, away_player_7, away_player_8, away_player_9, away_player_10, away_player_11
+        ]
+        
+        # Load data
+        teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models = load_data()
+        
+        # Load selected model
+        model, metadata = load_model(selected_model)
+        
+        # Try to predict using processed data first
+        prediction = None
+        if not processed_df.empty:
+            print("Attempting to use processed data for prediction...")
+            prediction = predict_with_processed_data(
+                model, home_team_id, away_team_id, match_date, processed_df, metadata
+            )
+        
+        # If processed data prediction failed, fall back to feature generation
+        if prediction is None:
+            print("Falling back to manual feature generation...")
+            # Generate features
+            features_df = generate_features(
+                home_team_id, away_team_id, 
+                home_players, away_players, 
+                match_date,
+                teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df
+            )
+            
+            # Make prediction
+            prediction = predict_match(model, features_df, metadata)
+            
+        # Prepare result
+        # Get team names with safer handling in case team is not found
+        home_team_filter = teams_df['team_api_id'] == home_team_id
+        away_team_filter = teams_df['team_api_id'] == away_team_id
+        
+        home_team_name = teams_df[home_team_filter]['team_long_name'].iloc[0] if any(home_team_filter) else f"Team {home_team_id}"
+        away_team_name = teams_df[away_team_filter]['team_long_name'].iloc[0] if any(away_team_filter) else f"Team {away_team_id}"
+        
+        # Format the output
+        result = f"## Match Prediction: {home_team_name} vs {away_team_name}\n\n"
+        result += f"**Win Probability for {home_team_name}:** {prediction['Win']*100:.2f}%\n\n"
+        result += f"**Draw Probability:** {prediction['Draw']*100:.2f}%\n\n"
+        result += f"**Win Probability for {away_team_name}:** {prediction['Loss']*100:.2f}%\n\n"
+        result += f"**Model Used:** {selected_model}\n"
+        
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"Error: {str(e)}"
 
 # UI update functions
 def update_home_players(home_team):
     """Update home player dropdown options when team is selected"""
     teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models = load_data()
-    home_team_id = int(home_team)
+    
+    # Extract team ID if it's a tuple
+    if isinstance(home_team, tuple):
+        home_team_id = int(home_team[1])
+    else:
+        home_team_id = int(home_team)
+        
     player_dict = get_players_for_team(home_team_id, players_df, player_attrs_df, test_matches_df, processed_df)
-    # Return 11 identical dropdowns
-    return [gr.Dropdown.update(choices=list(player_dict.keys()), value=None) for _ in range(11)]
+    # Return 11 identical dropdowns - use gr.update() instead of gr.Dropdown.update()
+    return [gr.update(choices=list(player_dict.keys()), value=None) for _ in range(11)]
 
 def update_away_players(away_team):
     """Update away player dropdown options when team is selected"""
     teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models = load_data()
-    away_team_id = int(away_team)
+    
+    # Extract team ID if it's a tuple
+    if isinstance(away_team, tuple):
+        away_team_id = int(away_team[1])
+    else:
+        away_team_id = int(away_team)
+        
     player_dict = get_players_for_team(away_team_id, players_df, player_attrs_df, test_matches_df, processed_df)
-    # Return 11 identical dropdowns
-    return [gr.Dropdown.update(choices=list(player_dict.keys()), value=None) for _ in range(11)]
+    # Return 11 identical dropdowns - use gr.update() instead of gr.Dropdown.update()
+    return [gr.update(choices=list(player_dict.keys()), value=None) for _ in range(11)]
 
 def load_teams():
     """Load teams for dropdowns using data from X_test.csv"""
     teams_df, _, _, _, _, processed_df, _ = load_data()
     
-    # Use teams directly from the teams_df created in load_data()
-    # (which now contains only teams from X_test.csv)
+    # Use teams directly from the teams_df created in load_data()    # (which now contains only teams from X_test.csv)
     available_teams = teams_df
     print(f"Found {len(available_teams)} teams in X_test data")
     
     # Create a dict mapping team name to team_api_id
     team_dict = dict(zip(available_teams['team_long_name'], available_teams['team_api_id']))
-    return gr.Dropdown.update(choices=list(team_dict.items()))
+    return gr.update(choices=list(team_dict.items()))
 
 def load_models():
     """Load available models for dropdown"""
@@ -517,15 +547,22 @@ def load_models():
     # Check if models are available
     if not models:
         print("Warning: No models found in models directory")
-        return gr.Dropdown.update(choices=[])
+        return gr.update(choices=[])
     
     # Return model names with descriptions for better display
     model_choices = [(f"{name} Model", name) for name in models.keys()]
-    return gr.Dropdown.update(choices=model_choices)
+    return gr.update(choices=model_choices)
 
 def player_selection_to_id(selection, team_id):
     """Convert player display name to player_api_id"""
     teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, _ = load_data()
+    
+    # Extract team ID if it's a tuple
+    if isinstance(team_id, tuple):
+        team_id = int(team_id[1])
+    else:
+        team_id = int(team_id)
+        
     player_dict = get_players_for_team(team_id, players_df, player_attrs_df, test_matches_df, processed_df)
     return player_dict.get(selection)
 
@@ -535,10 +572,15 @@ def create_interface():
         gr.Markdown("# Football Match Prediction")
         gr.Markdown("Select two teams, their players, and a match date to predict the outcome using machine learning.")
         
+        # Load team and model data first - this gets the data ready for the dropdowns
+        teams_df, players_df, player_attrs_df, team_attrs_df, test_matches_df, processed_df, models_dict = load_data()
+        team_choices = [(name, id) for name, id in zip(teams_df['team_long_name'], teams_df['team_api_id'])]
+        model_choices = [(f"{name} Model", name) for name in models_dict.keys()]
+        
         with gr.Row():
             with gr.Column():
                 gr.Markdown("### Home Team")
-                home_team = gr.Dropdown(label="Select Home Team", interactive=True)
+                home_team = gr.Dropdown(label="Select Home Team", choices=team_choices, interactive=True)
                 
                 gr.Markdown("#### Select 11 Players")
                 home_player_1 = gr.Dropdown(label="Player 1")
@@ -555,7 +597,7 @@ def create_interface():
                 
             with gr.Column():
                 gr.Markdown("### Away Team")
-                away_team = gr.Dropdown(label="Select Away Team", interactive=True)
+                away_team = gr.Dropdown(label="Select Away Team", choices=team_choices, interactive=True)
                 
                 gr.Markdown("#### Select 11 Players")
                 away_player_1 = gr.Dropdown(label="Player 1")
@@ -575,15 +617,10 @@ def create_interface():
                 label="Match Date (YYYY-MM-DD)", 
                 value=datetime.now().strftime("%Y-%m-%d")
             )
-            model_selector = gr.Dropdown(label="Select Prediction Model")
+            model_selector = gr.Dropdown(label="Select Prediction Model", choices=model_choices)
         
         predict_btn = gr.Button("Predict Match Outcome")
         result_output = gr.Markdown()
-        
-        # Load teams and models when the app starts
-        home_team.update = load_teams
-        away_team.update = load_teams
-        model_selector.update = load_models
         
         # Update player dropdowns when team is selected
         home_team.change(
